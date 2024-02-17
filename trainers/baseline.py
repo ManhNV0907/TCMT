@@ -6,7 +6,6 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader, ConcatDataset, Subset
 from transformers import get_linear_schedule_with_warmup
 from model.baseline import Baseline
-from model.l2p import L2P
 from utils.read_data import statistic
 
 
@@ -16,11 +15,7 @@ class Trainer:
         self.args = args
         if args.method == "baseline":
             self.model = Baseline(args)
-        elif args.method == "l2p":
-            self.model = L2P(args)
         self.task_num = 0
-        self.buffer = None
-        self.replay = self.args.buffer_ratio > 0 or self.args.buffer_size > 0
 
     def new_task(self, train_dataset, test_dataset, num_labels):
         self.task_num += 1
@@ -29,11 +24,8 @@ class Trainer:
         # fit to new dataset
         self.training(train_dataset)
         # self.training(train_dataset, test_dataset)
-        # evaluting
+        # evaluating
         self.evaluating(test_dataset)
-        if self.replay:
-            # collect data for buffer
-            self.collecting(train_dataset)
 
     def training(self, dataset, test_dataset=None):
         loader = DataLoader(
@@ -44,10 +36,6 @@ class Trainer:
         num_warmup_steps = num_training_steps * self.args.warmup_ratio
         scheduler = get_linear_schedule_with_warmup(
             optimizer, num_warmup_steps, num_training_steps)
-
-        if self.task_num > 1 and self.replay:
-            buffer_loader_iter = iter(DataLoader(
-                self.buffer, batch_size=self.args.batch_size, shuffle=True))
 
         self.model.cuda()
         for epoch in range(self.args.epochs_list[self.task_num - 1]):
@@ -64,15 +52,6 @@ class Trainer:
                 correct += torch.sum(pred == labels).item()
                 total += len(labels)
 
-                # replaying
-                if self.replay and self.task_num > 1 and idx % self.args.replay_freq == 0:
-                    try:
-                        batch = next(buffer_loader_iter)
-                    except:
-                        buffer_loader_iter = iter(DataLoader(
-                            self.buffer, batch_size=self.args.batch_size, shuffle=True))
-                        batch = next(buffer_loader_iter)
-                    self.optimization(batch, optimizer, scheduler)
 
             print(f"Epoch {epoch} Training Accuracy: {correct/total}")
             print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
@@ -129,27 +108,4 @@ class Trainer:
         print(f"-" * 50)
         return eval_acc
 
-    def collecting(self, dataset):
-        if self.args.buffer_size == 0:
-            buffer_size = math.ceil(len(dataset) * self.args.buffer_ratio)
-        else:
-            buffer_size = self.args.buffer_size
-        # buffer_size per class
-        label_space = set(dataset.labels)
-        capacity = {label: buffer_size for label in label_space}
-        indices = []
-        # iterate shuffled dataset labels with index
-        for idx, label in np.random.permutation(list(enumerate(dataset.labels))):
-            if capacity[label] > 0:
-                indices.append(idx)
-                capacity[label] -= 1
-            if sum(capacity.values()) == 0:
-                break
-        subset = Subset(dataset, indices)
-
-        self.buffer = ConcatDataset(
-            [self.buffer, subset]) if self.buffer is not None else subset
-        print(f"Add {len(subset)} samples to buffer")
-        print(f"Buffer size: {len(self.buffer)}")
-        print(f"Statistics of buffer:")
-        statistic(self.buffer)
+   
