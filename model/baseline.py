@@ -64,6 +64,9 @@ class Baseline(nn.Module):
         return_dict=None,
         past_key_values=None
     ):
+        raw_embedding = self.model.embeddings(
+        input_ids, position_ids, token_type_ids)
+        inputs_embeds = raw_embedding
         outputs = self.model(
             attention_mask=attention_mask,
             head_mask=head_mask,
