@@ -36,26 +36,18 @@ class Baseline(nn.Module):
     def new_task(self, num_labels):
         self.old_num_labels = self.num_labels
 
-        # save old model for distillation
-        if self.num_tasks > 0 and self.args.lwf:
-            self.old_model = None
-            self.old_model = deepcopy(self)
-            # freeze old model's parameters for accelerating
-            for param in self.old_model.parameters():
-                param.requires_grad = False
-
         self.num_tasks += 1
 
-        # with torch.no_grad():
-        #     # expand classifier
-        #     num_old_labels = self.num_labels
-        #     self.num_labels += num_labels
-        #     w = self.classifier.weight.data.clone()
-        #     b = self.classifier.bias.data.clone()
-        #     self.classifier = nn.Linear(
-        #         self.config.hidden_size, self.num_labels, device=self.device)
-        #     self.classifier.weight.data[:num_old_labels] = w
-        #     self.classifier.bias.data[:num_old_labels] = b
+        with torch.no_grad():
+            # expand classifier
+            num_old_labels = self.num_labels
+            self.num_labels += num_labels
+            w = self.classifier.weight.data.clone()
+            b = self.classifier.bias.data.clone()
+            self.classifier = nn.Linear(
+                self.config.hidden_size, self.num_labels, device=self.device)
+            self.classifier.weight.data[:num_old_labels] = w
+            self.classifier.bias.data[:num_old_labels] = b
 
     def get_prelogits(
         self,
@@ -123,23 +115,15 @@ class Baseline(nn.Module):
             return logits
 
         if self.training:
-            if self.old_model is not None and self.args.lwf:
-                with torch.no_grad():
-                    old_logits = self.old_model(**args, get_logits=True)
+    
 
-                # distillation loss
-                dis_loss = lwf_loss(
-                    logits[:, :self.old_num_labels], old_logits, self.args.T)
-
-            if self.num_tasks > 1 and self.args.buffer_ratio == 0 and self.args.buffer_size == 0:
-                logits[:, :self.old_num_labels] = -1e4
+            # if self.num_tasks > 1 and self.args.buffer_ratio == 0 and self.args.buffer_size == 0:
+            #     logits[:, :self.old_num_labels] = -1e4
 
             if labels is not None:
                 loss_fct = nn.CrossEntropyLoss()
                 loss = loss_fct(
                     logits.view(-1, logits.shape[-1]), labels.view(-1))
-                if self.old_model is not None and self.args.lwf:
-                    loss += dis_loss
         else:
             loss = None
 
@@ -160,18 +144,6 @@ class SequenceClassifierOutput(ModelOutput):
     attentions: Optional[Tuple[torch.FloatTensor]] = None
 
 
-def lwf_loss(pred, soft, T=2):
-    """
-    args:
-        pred: logits of student model, [n, old_num_labels]
-        soft: logits of teacher model, [n, old_num_labels]
-        T: temperature
-    return:
-        loss: distillation loss (batch mean)
-    """
-    pred = torch.log_softmax(pred / T, dim=1)
-    soft = torch.softmax(soft / T, dim=1)
-    return -1 * torch.mul(soft, pred).sum() / pred.shape[0]
 
 class Classifier(nn.Module):
     def __init__(self, args, final_linear=None):
