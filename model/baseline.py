@@ -20,7 +20,9 @@ class Baseline(nn.Module):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         self.classifier = nn.Linear(
-            self.config.hidden_size, args.num_labels, device=self.device)
+            # self.config.hidden_size, args.num_labels, device=self.device)
+            self.config.hidden_size, 0, device=self.device)
+        
     
 
         if self.args.frozen:
