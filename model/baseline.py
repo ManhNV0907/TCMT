@@ -8,7 +8,7 @@ from transformers.utils import ModelOutput
 from utils.assets import get_prompts_data, mean_pooling
 
 
-class Baseline(nn.Module):
+class Encoder(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
@@ -20,15 +20,11 @@ class Baseline(nn.Module):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         self.classifier = nn.Linear(
-            # self.config.hidden_size, args.num_labels, device=self.device)
+            # self.config.hidden_size, 38, device=self.device)
             self.config.hidden_size, 0, device=self.device)
         
-    
-
-        if self.args.frozen:
-            # frozen model's parameters
-            for param in self.model.parameters():
-                param.requires_grad = False
+        for param in self.model.parameters():
+            param.requires_grad = False
 
         self.num_labels = 0
         self.num_tasks = 0
@@ -39,7 +35,10 @@ class Baseline(nn.Module):
         self.old_num_labels = self.num_labels
 
         self.num_tasks += 1
-
+        # save old model for distillation
+        if self.num_tasks > 0:
+            self.old_model = None
+            self.old_model = deepcopy(self)
         with torch.no_grad():
             # expand classifier
             num_old_labels = self.num_labels
@@ -122,8 +121,8 @@ class Baseline(nn.Module):
         if self.training:
     
 
-            # if self.num_tasks > 1 and self.args.buffer_ratio == 0 and self.args.buffer_size == 0:
-            #     logits[:, :self.old_num_labels] = -1e4
+            if self.num_tasks > 1 and self.args.buffer_ratio == 0 and self.args.buffer_size == 0:
+                logits[:, :self.old_num_labels] = -1e4
 
             if labels is not None:
                 loss_fct = nn.CrossEntropyLoss()
@@ -137,6 +136,7 @@ class Baseline(nn.Module):
             logits=logits,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
+            prelogits = pooled_output
         )
 
 
@@ -146,19 +146,20 @@ class SequenceClassifierOutput(ModelOutput):
     loss: Optional[torch.FloatTensor] = None
     logits: torch.FloatTensor = None
     hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-    attentions: Optional[Tuple[torch.FloatTensor]] = None
+    attentions: Optional[Tuple[torch.FloatTensor]] = None,
+    prelogits: torch.FloatTensor = None
 
 
 
 class Classifier(nn.Module):
     def __init__(self, args, final_linear=None):
-        top_linear = final_linear if final_linear is not None else nn.Linear(args.encoder_output_size, args.rel_per_task * args.num_tasks)
+        top_linear = final_linear if final_linear is not None else nn.Linear(768,38)
         super().__init__()
         self.head = nn.Sequential(
-            nn.Linear(args.encoder_output_size * 2, args.encoder_output_size, bias=True),
+            nn.Linear(768, 768, bias=True),
             nn.ReLU(inplace=True),
-            nn.Linear(args.encoder_output_size, args.encoder_output_size, bias=True),
-            nn.ReLU(inplace=True),
+            # nn.Linear(768, 768, bias=True),
+            # nn.ReLU(inplace=True),
             top_linear,
         ).to(args.device)
 
