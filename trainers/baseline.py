@@ -62,6 +62,7 @@ class Trainer:
         # self.model.cuda()
         self.encoder.cuda()
         self.classifier.cuda()
+        self.temp_classifier.cuda()
 
         # X_embedding = {}
         new_data = copy.deepcopy(dataset)
@@ -137,7 +138,8 @@ class Trainer:
             scheduler_tmp = get_linear_schedule_with_warmup(
                                     optimizer_tmp, num_warmup_steps, num_training_steps)
             for epoch in range(self.args.epochs_list[self.task_num - 1]):
-                self.classifier.train()
+                # self.classifier.train()
+                self.temp_classifier.train()
                 correct, total = 0, 0
                 total_loss = 0
                 for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
