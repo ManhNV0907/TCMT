@@ -191,9 +191,10 @@ class Trainer:
                     replay_embed = torch.cat(replay_embed, dim=0)
                     print(replay_embed)
                     print(replay_embed.shape)
-                    replay_reps = self.classifier(torch.tensor(replay_embed).cuda())
-                    loss_mem = loss_fct(
-                        replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
+                    # replay_reps = self.classifier(torch.tensor(replay_embed).cuda())
+                    loss_mem = 0
+                    # loss_mem = loss_fct(
+                    #     replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
                     total_loss += loss.item()
                     training_loss = loss + distill_loss + loss_mem
                     training_loss.backward()
