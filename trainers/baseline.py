@@ -10,6 +10,7 @@ from model.baseline import Encoder, Classifier
 from utils.read_data import statistic
 import torch.nn.functional as F
 from sklearn.mixture import GaussianMixture
+import random
 
 class Trainer:
 
@@ -88,7 +89,7 @@ class Trainer:
             self.key_mixture[label].weights_[0] = 1.0
         #Sample prelogits 
         for i, label in enumerate(self.curr_label_set):
-            replay_embedding =  self.key_mixture[label].sample(100 * 256)[0].astype("float32")
+            replay_embedding =  self.key_mixture[label].sample(100 * 256).astype("float32")
             self.buffer_embedding[label].append(replay_embedding)
         
         # if self.task_num > 1:
@@ -173,8 +174,13 @@ class Trainer:
                         cur_reps.view(-1, cur_reps.shape[-1]), labels.view(-1))
                     distill_loss = self.distill_loss(
                         cur_reps[:, self.classifier.old_num_labels:], past_reps[:, self.classifier.old_num_labels:])
+                    #Forwar Memory
+                    replay_embed, replay_labels = sample_batch(self.buffer_embedding, 32)
+                    replay_reps = self.classifier(torch.tensor(replay_embed).cuda())
+                    loss_mem = loss_fct(
+                        replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
                     total_loss += loss.item()
-                    training_loss = loss + distill_loss
+                    training_loss = loss + distill_loss + loss_mem
                     training_loss.backward()
                     optimizer.step()
                     scheduler.step()
@@ -263,3 +269,30 @@ class Trainer:
         pred = torch.log_softmax(pred / T, dim=1)
         soft = torch.softmax(soft / T, dim=1)
         return -1 * torch.mul(soft, pred).sum() / pred.shape[0]
+    import random
+
+def sample_batch(memory, batch_size):
+
+  labels = list(memory.keys())
+
+#   num_inputs_ids = len(memory[labels[0]])
+  inputs_batch = []
+  labels_batch = []
+
+  while len(inputs_batch) < batch_size:
+    label = random.choice(labels)
+
+    input_ids = random.choice(memory[label])
+
+    inputs_batch.append(input_ids)
+    labels_batch.append(label)
+
+#   # Kiểm tra xem batch đã đầy đủ hay chưa
+#   if len(inputs_batch) < batch_size:
+#     # Padding nếu cần thiết
+#     for i in range(batch_size - len(inputs_batch)):
+#       inputs_batch.append(tf.constant([0] * num_inputs_ids))  # Padding bằng 0
+#       labels_batch.append(labels[0])  # Gán label mặc định cho padding
+
+  return inputs_batch, labels_batch
+
