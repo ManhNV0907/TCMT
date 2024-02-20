@@ -91,8 +91,7 @@ class Trainer:
             self.key_mixture[label].weights_[0] = 1.0
         #Sample prelogits 
         for i, label in enumerate(self.curr_label_set):
-            replay_embedding =  self.key_mixture[label].sample(100 * 256)[0]
-            # .astype("float32")
+            replay_embedding =  self.key_mixture[label].sample(100 * 256)[0].astype("float32")
             self.buffer_embedding[label].append(torch.tensor(replay_embedding))
         
         # if self.task_num > 1:
@@ -178,7 +177,7 @@ class Trainer:
                     distill_loss = self.distill_loss(
                         cur_reps[:, self.classifier.old_num_labels:], past_reps[:, self.classifier.old_num_labels:])
                     #Forwar Memory
-                    replay_embed, replay_labels = sample_batch(self.past_memory, 32)
+                    replay_embed, replay_labels = sample_batch(self.past_memory, 3)
                     replay_labels = torch.tensor(replay_labels).cuda()
                     print(replay_embed[0].shape)
                     print(replay_labels)
