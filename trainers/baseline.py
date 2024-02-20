@@ -110,8 +110,8 @@ class Trainer:
                     # print(labels)
                     optimizer.zero_grad()
                     logits = self.classifier(cur_embeding[idx].cuda())
-                    print(cur_embeding[idx].shape)
-                    print(cur_embeding[idx])
+                    # print(cur_embeding[idx].shape)
+                    # print(cur_embeding[idx])
                     loss_fct = nn.CrossEntropyLoss()
                     loss = loss_fct(
                         logits.view(-1, logits.shape[-1]), labels.view(-1))
@@ -189,6 +189,8 @@ class Trainer:
                     print(replay_embed[0].shape)
                     # replay_reps = self.classifier(torch.tensor(replay_embed).cuda())
                     replay_embed = torch.cat(replay_embed, dim=0)
+                    print(replay_embed)
+                    print(replay_embed[0].shape)
                     replay_reps = self.classifier(torch.tensor(replay_embed).cuda())
                     loss_mem = loss_fct(
                         replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
