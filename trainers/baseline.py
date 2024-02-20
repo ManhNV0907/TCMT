@@ -194,11 +194,12 @@ class Trainer:
                     # print(replay_embed)
                     # print(len(replay_embed))
                     # print(replay_embed.shape)
-                    replay_reps = self.classifier(torch.tensor(replay_embed).cuda())[:, :self.classifier.old_num_labels]
+                    replay_reps = self.classifier(replay_embed.cuda())
+                    # replay_reps = self.classifier(replay_embed.cuda())[:, :self.classifier.old_num_labels]
                     # loss_mem = 0
                     loss_mem = loss_fct(
                         replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
-                    # total_loss += loss.item()
+                    total_loss += loss.item()
                     training_loss = loss + distill_loss + loss_mem
                     training_loss.backward()
                     optimizer.step()
