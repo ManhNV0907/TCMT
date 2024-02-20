@@ -85,8 +85,9 @@ class Trainer:
                 self.buffer_distribution[labels[i].item()].append(outputs[i].cpu())
         
         for label in self.curr_label_set:
-            self.buffer_distribution[label] =  torch.cat(self.buffer_distribution[label], dim=0).reshape(-1, 1)
-            self.key_mixture[label] = GaussianMixture(n_components=1, random_state=42).fit(self.buffer_distribution[label].cpu().detach().numpy())
+            # self.buffer_distribution[label] =  torch.cat(self.buffer_distribution[label], dim=0).reshape(-1, 1)
+            # self.key_mixture[label] = GaussianMixture(n_components=1, random_state=42).fit(self.buffer_distribution[label].cpu().detach().numpy())
+            self.key_mixture[label] = GaussianMixture(n_components=1, random_state=42).fit(self.buffer_distribution[label])
             # if self.args.gmm_num_components == 1:
             self.key_mixture[label].weights_[0] = 1.0
         #Sample prelogits 
@@ -181,11 +182,11 @@ class Trainer:
                     replay_embed, replay_labels = sample_batch(self.past_memory, 3)
                     replay_labels = torch.tensor(replay_labels).cuda()
                     
-                    print(replay_labels)
-                    print(replay_embed[0])
+                    # print(replay_labels)
+                    print(replay_embed)
                     print(replay_embed[0][0].shape)
                     # replay_reps = self.classifier(torch.tensor(replay_embed).cuda())
-                    replay_reps = self.classifier(replay_embed[0].cuda())
+                    replay_reps = self.classifier(torch.tensor(replay_embed).cuda())
                     loss_mem = loss_fct(
                         replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
                     total_loss += loss.item()
