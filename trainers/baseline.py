@@ -225,6 +225,7 @@ class Trainer:
                         if param.grad is None:
                             print(param.grad)
                             print(name)
+                            continue
                         else:
                             print(param.grad)
                             print(name)
