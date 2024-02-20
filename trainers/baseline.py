@@ -197,7 +197,7 @@ class Trainer:
                     # print(past_reps)
                     # loss components
 
-                    # loss_fct = nn.CrossEntropyLoss()
+                    loss_fct = nn.CrossEntropyLoss()
                     # loss = loss_fct(
                     #     cur_reps.view(-1, cur_reps.shape[-1]), labels.view(-1))
                     loss = F.cross_entropy(cur_reps.view(-1, cur_reps.shape[-1]), labels.view(-1), reduction="mean")
