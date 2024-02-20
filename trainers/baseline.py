@@ -259,7 +259,7 @@ class Trainer:
                     input_ids=input_ids,
                     attention_mask=attention_mask,
                 ))
-                logits = outputs.logits
+                logits = outputs
                 pred = torch.argmax(logits, dim=1)
                 correct += torch.sum(pred == labels).item()
                 total += len(labels)
