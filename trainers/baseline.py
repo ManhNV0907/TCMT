@@ -199,19 +199,21 @@ class Trainer:
                         replay_reps[:, :self.classifier.old_num_labels], past_replay_reps[:, :self.classifier.old_num_labels])
                     total_loss += loss.item()
                     # Backward and optimize
-                    distill_loss.backward()
-                    distill_shared_grad = []
-                    for param in self.classifier.parameters():
-                        distill_shared_grad.append(param.grad.detach().data.clone().flatten())
-                        param.grad.zero_()
-                    distill_shared_grad = torch.cat(distill_shared_grad, dim=0)
-
                     loss.backward()
                     loss_shared_grad = []
                     for param in self.classifier.parameters():
+                        print(param.grad)
                         loss_shared_grad.append(param.grad.detach().data.clone().flatten())
                         param.grad.zero_()
                     loss_shared_grad = torch.cat(loss_shared_grad, dim=0)
+
+                    distill_loss.backward()
+                    distill_shared_grad = []
+                    for param in self.classifier.parameters():
+                        print(param.grad)
+                        distill_shared_grad.append(param.grad.detach().data.clone().flatten())
+                        param.grad.zero_()
+                    distill_shared_grad = torch.cat(distill_shared_grad, dim=0)
 
                     distill_loss_mem.backward()
                     distill_mem_shared_grad = []
