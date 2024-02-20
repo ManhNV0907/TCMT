@@ -185,37 +185,26 @@ class Trainer:
                     distill_loss = self.distill_loss(
                         cur_reps[:, self.classifier.old_num_labels:], past_reps[:, self.classifier.old_num_labels:])
                     #Forwar Memory
-                    replay_embed, replay_labels = sample_batch(self.past_memory, 32)
+                    replay_embed, replay_labels = sample_batch(self.past_memory, 64)
                     replay_labels = torch.tensor(replay_labels).cuda()
-                    
-                    # print(replay_labels)
-                    # print(replay_embed)
-                    # print(replay_embed.shape)
-                    # replay_reps = self.classifier(torch.tensor(replay_embed).cuda())
-                    # replay_embed = torch.cat(replay_embed, dim=0)
                     replay_embed = torch.stack(replay_embed)
-                    # print(replay_labels)
-                    # print(replay_embed)
-                    # print(len(replay_embed))
-                    # print(replay_embed.shape)
                     replay_reps = self.classifier(replay_embed.cuda())
                     replay_reps[:,self.classifier.old_num_labels:] = -1e4
-                    # replay_reps = self.classifier(replay_embed.cuda())[:, :self.classifier.old_num_labels]
-                    # loss_mem = 0
+                    past_replay_reps = self.past_classifier(replay_embed.cuda())
+                    past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     loss_mem = loss_fct(
                         replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
+                    distill_loss_mem = self.distill_loss(
+                        replay_reps[:, :self.classifier.old_num_labels], past_replay_reps[:, :self.classifier.old_num_labels])
                     total_loss += loss.item()
-                    training_loss = loss + distill_loss + loss_mem
+                    training_loss = loss + distill_loss + loss_mem + distill_loss_mem
                     training_loss.backward()
                     optimizer.step()
                     scheduler.step()
-                    # _, _, labels = batch
-                    # print(labels)
-                    # labels = labels.cuda()
                     pred = torch.argmax(cur_reps, dim=1)
                     correct += torch.sum(pred == labels).item()
                     total += len(labels)
-                    # break
+                    
 
                 print(f"Epoch {epoch} Training Accuracy: {correct/total}")
                 print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
@@ -229,23 +218,6 @@ class Trainer:
             # print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
             # if test_dataset is not None:
             #     self.evaluating(test_dataset)
-
-    # def optimization(self, batch, optimizer, scheduler):
-    #     input_ids, attention_mask, labels = batch
-    #     input_ids = input_ids.cuda()
-    #     attention_mask = attention_mask.cuda()
-    #     labels = labels.cuda()
-    #     optimizer.zero_grad()
-    #     outputs = self.model(
-    #         input_ids=input_ids,
-    #         attention_mask=attention_mask,
-    #         labels=labels
-    #     )
-    #     loss = outputs.loss
-    #     loss.backward()
-    #     optimizer.step()
-    #     scheduler.step()
-    #     return outputs
 
     def evaluating(self, dataset):
         loader = DataLoader(
@@ -312,13 +284,6 @@ def sample_batch(memory, batch_size):
 
     inputs_batch.append(input_ids)
     labels_batch.append(label)
-
-#   # Kiểm tra xem batch đã đầy đủ hay chưa
-#   if len(inputs_batch) < batch_size:
-#     # Padding nếu cần thiết
-#     for i in range(batch_size - len(inputs_batch)):
-#       inputs_batch.append(tf.constant([0] * num_inputs_ids))  # Padding bằng 0
-#       labels_batch.append(labels[0])  # Gán label mặc định cho padding
 
   return inputs_batch, labels_batch
 

@@ -69,7 +69,7 @@ def main(args):
         print(f"Avg. Fgt: {fgt.mean().round(4)}")
         print(f"-" * 50)
 
-    tunable_params_stastic(trainer.model)
+    tunable_params_stastic(trainer.classifier)
     print(f"Total time: {time.time() - start_time:.2f}s")
 
     # if args.save_dir:
