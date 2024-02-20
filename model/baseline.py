@@ -135,7 +135,7 @@ class Classifier(nn.Module):
         self.top_linear = nn.Linear(self.config.hidden_size,0)
         self.num_labels = 0
         self.num_tasks = 0
-        self.old_model = None
+        # self.old_model = None
         # self.cur_model = None
         self.head = nn.Sequential(
             nn.Linear(768, 768, bias=True),
@@ -158,9 +158,9 @@ class Classifier(nn.Module):
 
         self.num_tasks += 1
         # save old model for distillation
-        if self.num_tasks > 0:
-            self.old_model = None
-            self.old_model = deepcopy(self)
+        # if self.num_tasks > 0:
+        #     self.old_model = None
+        #     self.old_model = deepcopy(self)
         with torch.no_grad():
             # expand classifier
             num_old_labels = self.num_labels
