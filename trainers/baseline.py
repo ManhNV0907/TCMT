@@ -161,13 +161,16 @@ class Trainer:
                 print(f"Epoch {epoch} Training Accuracy: {correct/total}")
                 print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
             self.finetuned_classifier = self.classifier.get_cur_classifer()
+            self.classifier = self.past_classifier
+            optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
+            scheduler = get_linear_schedule_with_warmup(
+                                    optimizer, num_warmup_steps, num_training_steps)
             for epoch in range(self.args.epochs_list[self.task_num - 1]):
-                self.classifier = self.past_classifier
                 self.classifier.train()
                 correct, total = 0, 0
                 total_loss = 0
-                for param in self.classifier.parameters():
-                     param.requires_grad = True
+                # for param in self.classifier.parameters():
+                #      param.requires_grad = True
                 for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
                     #Distill current classifier vs finetuned classifier
                     labels = cur_label[idx]
@@ -183,6 +186,7 @@ class Trainer:
                     past_reps[:,:self.classifier.old_num_labels] = -1e4
                     # print(past_reps)
                     # loss components
+
                     # loss_fct = nn.CrossEntropyLoss()
                     # loss = loss_fct(
                     #     cur_reps.view(-1, cur_reps.shape[-1]), labels.view(-1))
