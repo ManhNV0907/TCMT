@@ -181,7 +181,7 @@ class Trainer:
                     distill_loss = self.distill_loss(
                         cur_reps[:, self.classifier.old_num_labels:], past_reps[:, self.classifier.old_num_labels:])
                     #Forwar Memory
-                    replay_embed, replay_labels = sample_batch(self.past_memory, 3)
+                    replay_embed, replay_labels = sample_batch(self.past_memory, 32)
                     replay_labels = torch.tensor(replay_labels).cuda()
                     
                     # print(replay_labels)
@@ -194,7 +194,7 @@ class Trainer:
                     # print(replay_embed)
                     # print(len(replay_embed))
                     # print(replay_embed.shape)
-                    replay_reps = self.classifier(torch.tensor(replay_embed).cuda())
+                    replay_reps = self.classifier(torch.tensor(replay_embed).cuda())[:, :self.classifier.old_num_labels]
                     # loss_mem = 0
                     loss_mem = loss_fct(
                         replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
