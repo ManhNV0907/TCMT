@@ -151,7 +151,7 @@ class Trainer:
                     optimizer.zero_grad()
                     logits = self.classifier(cur_embeding[idx].cuda())
                     # logits = self.temp_classifier(cur_embeding[idx].cuda())
-                    logits[:, :self.classifier.old_num_labels] = -1e4
+                    # logits[:, :self.classifier.old_num_labels] = -1e4
                     loss_fct = nn.CrossEntropyLoss()
                     loss = loss_fct(
                         logits.view(-1, logits.shape[-1]), labels.view(-1))
@@ -187,12 +187,12 @@ class Trainer:
                     optimizer.zero_grad()
                     # print(cur_embeding[idx])
                     cur_reps = self.classifier(cur_embeding[idx].cuda())
-                    cur_reps[:,:self.classifier.old_num_labels] = -1e4
+                    # cur_reps[:,:self.classifier.old_num_labels] = -1e4
                     
                     # print(cur_reps)
                     with torch.no_grad():
                         past_reps = self.finetuned_classifier(cur_embeding[idx].cuda())
-                    past_reps[:,:self.classifier.old_num_labels] = -1e4
+                    # past_reps[:,:self.classifier.old_num_labels] = -1e4
 
                     # print(past_reps)
                     # loss components
@@ -202,21 +202,28 @@ class Trainer:
                         cur_reps.view(-1, cur_reps.shape[-1]), labels.view(-1))
                     # loss = F.cross_entropy(cur_reps.view(-1, cur_reps.shape[-1]), labels.view(-1), reduction="mean")
                     # print(loss.item())
+
+                    # distill_loss = self.distill_loss(
+                    #     cur_reps[:, self.classifier.old_num_labels:], past_reps[:, self.classifier.old_num_labels:])
                     distill_loss = self.distill_loss(
-                        cur_reps[:, self.classifier.old_num_labels:], past_reps[:, self.classifier.old_num_labels:])
+                        cur_reps, past_reps) 
+                       
                     #Forwar Memory
                     replay_embed, replay_labels = sample_batch(self.past_memory, 64)
                     replay_labels = torch.tensor(replay_labels).cuda()
                     replay_embed = torch.stack(replay_embed)
                     replay_reps = self.classifier(replay_embed.cuda())
-                    replay_reps[:,self.classifier.old_num_labels:] = -1e4
+                    # replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     with torch.no_grad():
                         past_replay_reps = self.past_classifier(replay_embed.cuda())
-                    past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
+                    # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     loss_mem = loss_fct(
                         replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
+                    # distill_loss_mem = self.distill_loss(
+                    #     replay_reps[:, :self.classifier.old_num_labels], past_replay_reps[:, :self.classifier.old_num_labels])
                     distill_loss_mem = self.distill_loss(
-                        replay_reps[:, :self.classifier.old_num_labels], past_replay_reps[:, :self.classifier.old_num_labels])
+                        replay_reps, past_replay_reps)
+
                     total_loss += loss.item()
                     # # Backward and optimize
                     # loss.backward(retain_graph=True)
@@ -340,7 +347,7 @@ class Trainer:
         return eval_acc
     
 
-    def distill_loss(self, pred, soft, T=2):
+    def distill_loss(self, pred, soft, T=1):
         """
         args:
             pred: logits of student model, [n, old_num_labels]
