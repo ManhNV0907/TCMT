@@ -240,7 +240,7 @@ class Trainer:
                         param.grad.zero_()
                     loss_shared_grad = torch.cat(loss_shared_grad, dim=0)
 
-                    distill_loss.backward()
+                    distill_loss.backward(retain_graph=True)
                     distill_shared_grad = []
                     for name, param in self.classifier.named_parameters():
                         if param.grad is None:
@@ -252,7 +252,7 @@ class Trainer:
                         param.grad.zero_()
                     distill_shared_grad = torch.cat(distill_shared_grad, dim=0)
 
-                    distill_loss_mem.backward()
+                    distill_loss_mem.backward(retain_graph=True)
                     distill_mem_shared_grad = []
                     for name, param in self.classifier.named_parameters():
                         if param.grad is None:
