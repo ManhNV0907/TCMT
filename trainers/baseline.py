@@ -25,6 +25,7 @@ class Trainer:
         self.buffer_distribution = {}
         self.key_mixture = {}
         self.buffer_embedding = {}
+        self.past_memory = None
 
     def new_task(self, train_dataset, test_dataset, num_labels):
         self.task_num += 1
@@ -62,6 +63,7 @@ class Trainer:
         new_data = copy.deepcopy(dataset)
         cur_embeding = []
         cur_label = []
+        self.past_memory = self.buffer_embedding
         for idx, batch in enumerate(tqdm(loader, desc=f"Forward current data")):
             
             # print("Forward current data...")
@@ -89,9 +91,9 @@ class Trainer:
             self.key_mixture[label].weights_[0] = 1.0
         #Sample prelogits 
         for i, label in enumerate(self.curr_label_set):
-            replay_embedding =  self.key_mixture[label].sample(100 * 256)
+            replay_embedding =  self.key_mixture[label].sample(100 * 256)[0]
             # .astype("float32")
-            self.buffer_embedding[label].append(replay_embedding)
+            self.buffer_embedding[label].append(torch.tensor(replay_embedding))
         
         # if self.task_num > 1:
         #     self.past_classifier = copy.deepcopy(self)
@@ -176,7 +178,7 @@ class Trainer:
                     distill_loss = self.distill_loss(
                         cur_reps[:, self.classifier.old_num_labels:], past_reps[:, self.classifier.old_num_labels:])
                     #Forwar Memory
-                    replay_embed, replay_labels = sample_batch(self.buffer_embedding, 32)
+                    replay_embed, replay_labels = sample_batch(self.past_memory, 32)
                     # print(replay_embed[0].shape)
                     print(replay_labels)
                     print(replay_embed)
