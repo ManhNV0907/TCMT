@@ -183,9 +183,11 @@ class Trainer:
                     past_reps[:,:self.classifier.old_num_labels] = -1e4
                     # print(past_reps)
                     # loss components
-                    loss_fct = nn.CrossEntropyLoss()
-                    loss = loss_fct(
-                        cur_reps.view(-1, cur_reps.shape[-1]), labels.view(-1))
+                    # loss_fct = nn.CrossEntropyLoss()
+                    # loss = loss_fct(
+                    #     cur_reps.view(-1, cur_reps.shape[-1]), labels.view(-1))
+                    loss = F.cross_entropy(cur_reps.view(-1, cur_reps.shape[-1]), labels.view(-1), reduction="mean")
+                    print(loss.item())
                     distill_loss = self.distill_loss(
                         cur_reps[:, self.classifier.old_num_labels:], past_reps[:, self.classifier.old_num_labels:])
                     #Forwar Memory
