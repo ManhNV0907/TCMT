@@ -188,7 +188,7 @@ class Trainer:
                     print(replay_embed)
                     print(replay_embed[0].shape)
                     # replay_reps = self.classifier(torch.tensor(replay_embed).cuda())
-                    replay_embed = torch.cat(replay_embed, dim=0)
+                    # replay_embed = torch.cat(replay_embed, dim=0)
                     print(replay_embed)
                     print(replay_embed[0].shape)
                     replay_reps = self.classifier(torch.tensor(replay_embed).cuda())
@@ -297,7 +297,7 @@ def sample_batch(memory, batch_size):
   while len(inputs_batch) < batch_size:
     label = random.choice(labels)
 
-    input_ids = random.choice(memory[label])
+    input_ids = random.choice(memory[label][0])
 
     inputs_batch.append(input_ids)
     labels_batch.append(label)
