@@ -172,7 +172,7 @@ class Trainer:
                     # print(cur_embeding[idx])
                     cur_reps = self.classifier(cur_embeding[idx].cuda())
                     # print(cur_reps)
-                    past_reps = self.finetuned_classifier(cur_embeding[idx][0].cuda())
+                    past_reps = self.finetuned_classifier(cur_embeding[idx].cuda())
                     # print(past_reps)
                     # loss components
                     loss_fct = nn.CrossEntropyLoss()
