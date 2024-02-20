@@ -218,8 +218,10 @@ class Trainer:
     def evaluating(self, dataset):
         loader = DataLoader(
             dataset, batch_size=self.args.batch_size, shuffle=True)
-        self.model.cuda()
-        self.model.eval()
+        self.classifier.cuda()
+        self.encoder.cuda()
+        self.encoder.eval()
+        self.classifier.eval()
         with torch.no_grad():
             correct, total = 0, 0
             for _, batch in enumerate(tqdm(loader, desc="Evaluating")):
@@ -227,10 +229,10 @@ class Trainer:
                 input_ids = input_ids.cuda()
                 attention_mask = attention_mask.cuda()
                 labels = labels.cuda()
-                outputs = self.model(
+                outputs = self.classifier(self.encoder(
                     input_ids=input_ids,
                     attention_mask=attention_mask,
-                )
+                ))
                 logits = outputs.logits
                 pred = torch.argmax(logits, dim=1)
                 correct += torch.sum(pred == labels).item()
