@@ -143,7 +143,7 @@ class Trainer:
                     # print(labels)
                     optimizer.zero_grad()
                     logits = self.classifier(cur_embeding[idx].cuda())
-                    logits[:, :self.classifier.old_num_labels] = -1e4
+                    # logits[:, :self.classifier.old_num_labels] = -1e4
                     loss_fct = nn.CrossEntropyLoss()
                     loss = loss_fct(
                         logits.view(-1, logits.shape[-1]), labels.view(-1))
@@ -173,11 +173,11 @@ class Trainer:
                     optimizer.zero_grad()
                     # print(cur_embeding[idx])
                     cur_reps = self.classifier(cur_embeding[idx].cuda())
-                    cur_reps[:,:self.classifier.old_num_labels] = -1e4
+                    # cur_reps[:,:self.classifier.old_num_labels] = -1e4
                     
                     # print(cur_reps)
                     past_reps = self.finetuned_classifier(cur_embeding[idx].cuda())
-                    past_reps[:,:self.classifier.old_num_labels] = -1e4
+                    # past_reps[:,:self.classifier.old_num_labels] = -1e4
                     # print(past_reps)
                     # loss components
                     loss_fct = nn.CrossEntropyLoss()
@@ -190,9 +190,9 @@ class Trainer:
                     replay_labels = torch.tensor(replay_labels).cuda()
                     replay_embed = torch.stack(replay_embed)
                     replay_reps = self.classifier(replay_embed.cuda())
-                    replay_reps[:,self.classifier.old_num_labels:] = -1e4
+                    # replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     past_replay_reps = self.past_classifier(replay_embed.cuda())
-                    past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
+                    # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     loss_mem = loss_fct(
                         replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
                     distill_loss_mem = self.distill_loss(
