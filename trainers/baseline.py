@@ -23,6 +23,7 @@ class Trainer:
         # Classifier
         self.encoder = Encoder(args)
         self.classifier = Classifier(args)
+        self.temp_classifier = Classifier(args)
         self.buffer_distribution = {}
         self.key_mixture = {}
         self.buffer_embedding = {}
@@ -38,6 +39,7 @@ class Trainer:
             self.buffer_embedding[i] = []
         # expand classifier and prefix
         self.classifier.new_task(num_labels)
+        self.temp_classifier.new_task(num_labels)
         # train classifier with new dataset
         self.training(train_dataset)
         #train classifier with GMM data set
@@ -131,6 +133,9 @@ class Trainer:
                 print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
         else:
             self.past_classifier = self.classifier.get_cur_classifer()
+            optimizer_tmp = torch.optim.AdamW(self.temp_classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
+            scheduler_tmp = get_linear_schedule_with_warmup(
+                                    optimizer_tmp, num_warmup_steps, num_training_steps)
             for epoch in range(self.args.epochs_list[self.task_num - 1]):
                 self.classifier.train()
                 correct, total = 0, 0
@@ -142,15 +147,16 @@ class Trainer:
                     labels = labels.cuda()
                     # print(labels)
                     optimizer.zero_grad()
-                    logits = self.classifier(cur_embeding[idx].cuda())
+                    # logits = self.classifier(cur_embeding[idx].cuda())
+                    logits = self.temp_classifier(cur_embeding[idx].cuda())
                     logits[:, :self.classifier.old_num_labels] = -1e4
                     loss_fct = nn.CrossEntropyLoss()
                     loss = loss_fct(
                         logits.view(-1, logits.shape[-1]), labels.view(-1))
                     total_loss += loss.item()
                     loss.backward()
-                    optimizer.step()
-                    scheduler.step()
+                    optimizer_tmp.step()
+                    scheduler_tmp.step()
                     # _, _, labels = batch
                     # print(labels)
                     # labels = labels.cuda()
@@ -160,11 +166,11 @@ class Trainer:
 
                 print(f"Epoch {epoch} Training Accuracy: {correct/total}")
                 print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
-            self.finetuned_classifier = self.classifier.get_cur_classifer()
-            self.classifier = self.past_classifier
-            optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
-            scheduler = get_linear_schedule_with_warmup(
-                                    optimizer, num_warmup_steps, num_training_steps)
+            self.finetuned_classifier = self.temp_classifier.get_cur_classifer()
+            # self.classifier = self.past_classifier
+            # optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
+            # scheduler = get_linear_schedule_with_warmup(
+            #                         optimizer, num_warmup_steps, num_training_steps)
             for epoch in range(self.args.epochs_list[self.task_num - 1]):
                 self.classifier.train()
                 correct, total = 0, 0
