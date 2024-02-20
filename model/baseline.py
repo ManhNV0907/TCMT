@@ -18,10 +18,6 @@ class Encoder(nn.Module):
 
         self.dropout = nn.Dropout(self.config.hidden_dropout_prob)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-
-        # self.classifier = nn.Linear(
-        #     # self.config.hidden_size, 38, device=self.device)
-        #     self.config.hidden_size, 0, device=self.device)
         
         for param in self.model.parameters():
             param.requires_grad = False
@@ -29,26 +25,6 @@ class Encoder(nn.Module):
         self.num_labels = 0
         self.num_tasks = 0
         self.old_model = None
-
-
-    # def new_task(self, num_labels):
-    #     self.old_num_labels = self.num_labels
-
-    #     self.num_tasks += 1
-    #     # save old model for distillation
-    #     if self.num_tasks > 0:
-    #         self.old_model = None
-    #         self.old_model = deepcopy(self)
-    #     with torch.no_grad():
-    #         # expand classifier
-    #         num_old_labels = self.num_labels
-    #         self.num_labels += num_labels
-    #         w = self.classifier.weight.data.clone()
-    #         b = self.classifier.bias.data.clone()
-    #         self.classifier = nn.Linear(
-    #             self.config.hidden_size, self.num_labels, device=self.device)
-    #         self.classifier.weight.data[:num_old_labels] = w
-    #         self.classifier.bias.data[:num_old_labels] = b
 
     def get_prelogits(
         self,
@@ -95,7 +71,7 @@ class Encoder(nn.Module):
         output_hidden_states=None,
         return_dict=None,
         past_key_values=None,
-        get_prelogits=False,
+        get_prelogits=True,
     ):
 
         # for code readability
@@ -137,7 +113,7 @@ class Encoder(nn.Module):
         #     hidden_states=outputs.hidden_states,
         #     attentions=outputs.attentions,
         # )
-        return
+        return pooled_output
 
 
 @dataclass
@@ -166,6 +142,7 @@ class Classifier(nn.Module):
             # nn.Linear(768, 768, bias=True),
             # nn.ReLU(inplace=True),
         )
+        self.cur_model = deepcopy(self)
 
     def forward(self, x: torch.Tensor):
         x = self.head(x)
