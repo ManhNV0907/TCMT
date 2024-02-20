@@ -180,11 +180,11 @@ class Trainer:
                     #Forwar Memory
                     replay_embed, replay_labels = sample_batch(self.past_memory, 32)
                     replay_labels = torch.tensor(replay_labels).cuda()
-                    # print(replay_embed[0].shape)
+                    print(replay_embed[0].shape)
                     print(replay_labels)
                     print(replay_embed)
                     # replay_reps = self.classifier(torch.tensor(replay_embed).cuda())
-                    replay_reps = self.classifier(replay_embed.cuda())
+                    replay_reps = self.classifier(replay_embed[0].cuda())
                     loss_mem = loss_fct(
                         replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
                     total_loss += loss.item()
