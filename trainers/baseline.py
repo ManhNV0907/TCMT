@@ -1,6 +1,7 @@
 # learning without forgetting
 import math
 import torch
+from torch import nn
 import copy
 import numpy as np
 from tqdm import tqdm
@@ -10,33 +11,18 @@ from model.baseline import Encoder, Classifier
 from utils.read_data import statistic
 from sklearn.mixture import GaussianMixture
 
-# @torch.no_grad()
-# def convert_data_tokens_to_queries(args, data, encoder):
-#     data_loader = get_data_loader(args, data, shuffle=False)
-#     queries = []
-#     print("Forward data...")
-#     for (input_ids, attention_mask, labels) in tqdm(data_loader):
-#         # tokens = torch.stack([x.to(args.device) for x in tokens], dim=0)
-#         queries.append(encoder(input_ids))
-#     queries = torch.cat(queries, dim=0).cpu()
-
-#     new_data = copy.deepcopy(data)
-#     for i in range(len(new_data)):
-#         new_data[i]["tokens"] = queries[i]
-#     return new_data
-
 class Trainer:
 
     def __init__(self, args):
         self.args = args
-        if args.method == "baseline":
-            self.model = Encoder(args)
+        # if args.method == "baseline":
+            # self.model = Encoder(args)
         self.task_num = 0
         # past classifier
-        past_classifier = None
+        self.past_classifier = None
         # Classifier
-        # self.model = Baseline(args)
-        # self.classifier = Classifier(args)
+        self.encoder = Encoder(args)
+        self.classifier = Classifier(args)
         self.buffer_distribution = {}
         self.key_mixture = {}
         self.buffer_embedding = {}
@@ -46,10 +32,10 @@ class Trainer:
         self.curr_label_set = set(train_dataset.labels)
         for i in self.curr_label_set:
             self.buffer_distribution[i] = [] 
-            self.key_mixture[i] = 
+            self.key_mixture[i] = None
             self.buffer_embedding[i] = []
         # expand classifier and prefix
-        self.model.new_task(num_labels)
+        self.classifier.new_task(num_labels)
         # train classifier with new dataset
         self.training(train_dataset)
         #train classifier with GMM data set
@@ -69,92 +55,96 @@ class Trainer:
         num_warmup_steps = num_training_steps * self.args.warmup_ratio
         scheduler = get_linear_schedule_with_warmup(
             optimizer, num_warmup_steps, num_training_steps)
-        self.model.cuda()
-        # self.encoder.cuda()
-        # self.classifier.cuda()
+        # self.model.cuda()
+        self.encoder.cuda()
+        self.classifier.cuda()
 
         # X_embedding = {}
+        new_data = copy.deepcopy(dataset)
+        cur_embeding = []
         for idx, batch in enumerate(tqdm(loader, desc=f"Forward current data")):
+            
             print("Forward current data...")
             input_ids, attention_mask, labels = batch
             input_ids = input_ids.cuda()
             attention_mask = attention_mask.cuda()
             labels = labels.cuda()
             optimizer.zero_grad()
-            outputs = self.model(
+            outputs = self.encoder(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 labels=labels,
                 get_prelogits=True
             )
-            # print(outputs.keys())
+            cur_embeding.append(outputs)
             labels = labels.cpu()
-            # X_embedding[labels] = []
             for i, _ in enumerate(labels):
-                # print(labels[i].item())
-                # print(self.buffer_distribution.keys())
                 self.buffer_distribution[labels[i].item()].append(outputs[i].cpu())
-            # queries.append(outputs.prelogits)
+        
         for label in self.curr_label_set:
             self.buffer_distribution[label] =  torch.cat(self.buffer_distribution[label], dim=0).reshape(-1, 1)
-        # queries = torch.cat(queries, dim=0).cpu()
-        # new_data = copy.deepcopy(dataset)
+        
             self.key_mixture[label] = GaussianMixture(n_components=1, random_state=42).fit(self.buffer_distribution[label].cpu().detach().numpy())
             # if self.args.gmm_num_components == 1:
             self.key_mixture[label].weights_[0] = 1.0
                 # print()
-
-        # for i in range(len(new_data)):
-        #     new_data[i]["tokens"] = queries[i]
-        # Current encoded data
-        # cur_training_encoded = new_data
-
-        # for epoch in range(self.args.epochs_list[self.task_num - 1]):
-        #     self.model.train()
-        #     correct, total = 0, 0
-        #     total_loss = 0
-        #     for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
-        #         #Finetune classifier on current data
-        #         outputs = self.optimization(batch, optimizer, scheduler)
-
-        #         total_loss += outputs.loss.item()
-
-        #         _, _, labels = batch
-        #         labels = labels.cuda()
-        #         pred = torch.argmax(outputs.logits, dim=1)
-        #         correct += torch.sum(pred == labels).item()
-        #         total += len(labels)
-
         #Sample prelogits 
         for i, label in enumerate(self.curr_label_set):
             replay_embedding =  self.key_mixture[label].sample(100 * 256)[0].astype("float32")
             self.buffer_embedding[label].append(replay_embedding)
-            # print(replay_embedding)
+        cur_embeding = torch.cat(cur_embeding, dim=0).cpu()
+        for i in range(len(new_data)):
+            new_data[idx]["embedding"] = cur_embeding[i]
+        if self.task_num > 1:
+            self.past_classifier = copy.deepcopy(self.classifier())
+        for epoch in range(self.args.epochs_list[self.task_num - 1]):
+            self.classifier.train()
+            correct, total = 0, 0
+            total_loss = 0
+            for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
+                #Finetune classifier on current data
+                # _, _, labels = batch
+                # labels = labels.cuda()
+                optimizer.zero_grad()
+                logits = self.classifier(new_data[idx]["embedding"].cuda())
+                loss_fct = nn.CrossEntropyLoss()
+                loss = loss_fct(
+                    logits.view(-1, logits.shape[-1]), labels.view(-1))
+                total_loss += loss.item()
+                loss.backward()
+                optimizer.step()
+                scheduler.step()
+                _, _, labels = batch
+                labels = labels.cuda()
+                pred = torch.argmax(outputs.logits, dim=1)
+                correct += torch.sum(pred == labels).item()
+                total += len(labels)
+
+
            
-        print(self.buffer_embedding)
 
 
-            # print(f"Epoch {epoch} Training Accuracy: {correct/total}")
-            # print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
-            # if test_dataset is not None:
-            #     self.evaluating(test_dataset)
+            print(f"Epoch {epoch} Training Accuracy: {correct/total}")
+            print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
+            if test_dataset is not None:
+                self.evaluating(test_dataset)
 
-    def optimization(self, batch, optimizer, scheduler):
-        input_ids, attention_mask, labels = batch
-        input_ids = input_ids.cuda()
-        attention_mask = attention_mask.cuda()
-        labels = labels.cuda()
-        optimizer.zero_grad()
-        outputs = self.model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            labels=labels
-        )
-        loss = outputs.loss
-        loss.backward()
-        optimizer.step()
-        scheduler.step()
-        return outputs
+    # def optimization(self, batch, optimizer, scheduler):
+    #     input_ids, attention_mask, labels = batch
+    #     input_ids = input_ids.cuda()
+    #     attention_mask = attention_mask.cuda()
+    #     labels = labels.cuda()
+    #     optimizer.zero_grad()
+    #     outputs = self.model(
+    #         input_ids=input_ids,
+    #         attention_mask=attention_mask,
+    #         labels=labels
+    #     )
+    #     loss = outputs.loss
+    #     loss.backward()
+    #     optimizer.step()
+    #     scheduler.step()
+    #     return outputs
 
     def evaluating(self, dataset):
         loader = DataLoader(
@@ -189,32 +179,6 @@ class Trainer:
         print(f"-" * 50)
         return eval_acc
     
-    @torch.no_grad()
-    def sample_gmm_data(self, args, encoder, encoded_data, name, task_id):
-        """
-        :param encoded_data: (List) data of relation
-        """
 
-        encoder.eval()
-        data_loader = get_data_loader(args, encoded_data, shuffle=False)
-        td = tqdm(data_loader, desc=name)
-
-        # output dict
-        out = {}
-
-        # x_data
-        x_encoded = []
-
-        for (_, tokens, _) in td:
-            tokens = torch.stack([x.to(args.device) for x in tokens], dim=0)
-            x_encoded.append(tokens)
-            # x_encoded.append(encoder(tokens)) # When encoded_data is not encoded but is in original format (tokens)
-        x_encoded = torch.cat(x_encoded, dim=0)
-        key_mixture = GaussianMixture(n_components=args.gmm_num_components, random_state=args.seed).fit(x_encoded.cpu().detach().numpy())
-        if args.gmm_num_components == 1:
-            key_mixture.weights_[0] = 1.0
-
-        out["replay_key"] = key_mixture
-        return out
 
    

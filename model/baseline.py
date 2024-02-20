@@ -19,9 +19,9 @@ class Encoder(nn.Module):
         self.dropout = nn.Dropout(self.config.hidden_dropout_prob)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        self.classifier = nn.Linear(
-            # self.config.hidden_size, 38, device=self.device)
-            self.config.hidden_size, 0, device=self.device)
+        # self.classifier = nn.Linear(
+        #     # self.config.hidden_size, 38, device=self.device)
+        #     self.config.hidden_size, 0, device=self.device)
         
         for param in self.model.parameters():
             param.requires_grad = False
@@ -31,24 +31,24 @@ class Encoder(nn.Module):
         self.old_model = None
 
 
-    def new_task(self, num_labels):
-        self.old_num_labels = self.num_labels
+    # def new_task(self, num_labels):
+    #     self.old_num_labels = self.num_labels
 
-        self.num_tasks += 1
-        # save old model for distillation
-        if self.num_tasks > 0:
-            self.old_model = None
-            self.old_model = deepcopy(self)
-        with torch.no_grad():
-            # expand classifier
-            num_old_labels = self.num_labels
-            self.num_labels += num_labels
-            w = self.classifier.weight.data.clone()
-            b = self.classifier.bias.data.clone()
-            self.classifier = nn.Linear(
-                self.config.hidden_size, self.num_labels, device=self.device)
-            self.classifier.weight.data[:num_old_labels] = w
-            self.classifier.bias.data[:num_old_labels] = b
+    #     self.num_tasks += 1
+    #     # save old model for distillation
+    #     if self.num_tasks > 0:
+    #         self.old_model = None
+    #         self.old_model = deepcopy(self)
+    #     with torch.no_grad():
+    #         # expand classifier
+    #         num_old_labels = self.num_labels
+    #         self.num_labels += num_labels
+    #         w = self.classifier.weight.data.clone()
+    #         b = self.classifier.bias.data.clone()
+    #         self.classifier = nn.Linear(
+    #             self.config.hidden_size, self.num_labels, device=self.device)
+    #         self.classifier.weight.data[:num_old_labels] = w
+    #         self.classifier.bias.data[:num_old_labels] = b
 
     def get_prelogits(
         self,
@@ -95,7 +95,7 @@ class Encoder(nn.Module):
         output_hidden_states=None,
         return_dict=None,
         past_key_values=None,
-        get_logits=False,
+        get_prelogits=False,
     ):
 
         # for code readability
@@ -113,31 +113,31 @@ class Encoder(nn.Module):
         }
 
         outputs, pooled_output = self.get_prelogits(**args)
-        logits = self.classifier(pooled_output)
+        # logits = self.classifier(pooled_output)
 
-        if get_logits:
-            return logits
+        if get_prelogits:
+            return pooled_output
 
-        if self.training:
+        # if self.training:
     
 
-            if self.num_tasks > 1 and self.args.buffer_ratio == 0 and self.args.buffer_size == 0:
-                logits[:, :self.old_num_labels] = -1e4
+        #     if self.num_tasks > 1 and self.args.buffer_ratio == 0 and self.args.buffer_size == 0:
+        #         logits[:, :self.old_num_labels] = -1e4
 
-            if labels is not None:
-                loss_fct = nn.CrossEntropyLoss()
-                loss = loss_fct(
-                    logits.view(-1, logits.shape[-1]), labels.view(-1))
-        else:
-            loss = None
+        #     if labels is not None:
+        #         loss_fct = nn.CrossEntropyLoss()
+        #         loss = loss_fct(
+        #             logits.view(-1, logits.shape[-1]), labels.view(-1))
+        # else:
+        #     loss = None
 
-        return SequenceClassifierOutput(
-            loss=loss,
-            logits=logits,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-            prelogits = pooled_output
-        )
+        # return SequenceClassifierOutput(
+        #     loss=loss,
+        #     logits=logits,
+        #     hidden_states=outputs.hidden_states,
+        #     attentions=outputs.attentions,
+        # )
+        return
 
 
 @dataclass
@@ -146,22 +146,47 @@ class SequenceClassifierOutput(ModelOutput):
     loss: Optional[torch.FloatTensor] = None
     logits: torch.FloatTensor = None
     hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-    attentions: Optional[Tuple[torch.FloatTensor]] = None,
-    prelogits: torch.FloatTensor = None
+    attentions: Optional[Tuple[torch.FloatTensor]] = None
 
 
 
 class Classifier(nn.Module):
     def __init__(self, args, final_linear=None):
-        top_linear = final_linear if final_linear is not None else nn.Linear(768,38)
         super().__init__()
+        self.args = args
+        self.config = AutoConfig.from_pretrained(args.model_name_or_path)
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.top_linear = nn.Linear(self.config.hidden_size,0)
+        self.num_labels = 0
+        self.num_tasks = 0
+        self.old_model = None
         self.head = nn.Sequential(
             nn.Linear(768, 768, bias=True),
             nn.ReLU(inplace=True),
             # nn.Linear(768, 768, bias=True),
             # nn.ReLU(inplace=True),
-            top_linear,
-        ).to(args.device)
+        )
 
     def forward(self, x: torch.Tensor):
-        return self.head(x)
+        x = self.head(x)
+        out = self.top_linear(x)
+        return out    
+
+    def new_task(self, num_labels):
+        self.old_num_labels = self.num_labels
+
+        self.num_tasks += 1
+        # save old model for distillation
+        if self.num_tasks > 0:
+            self.old_model = None
+            self.old_model = deepcopy(self)
+        with torch.no_grad():
+            # expand classifier
+            num_old_labels = self.num_labels
+            self.num_labels += num_labels
+            w = self.top_linear.weight.data.clone()
+            b = self.top_linear.bias.data.clone()
+            self.top_linear = nn.Linear(
+                self.config.hidden_size, self.num_labels, device=self.device)
+            self.top_linear.weight.data[:num_old_labels] = w
+            self.top_linear.bias.data[:num_old_labels] = b
