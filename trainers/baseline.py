@@ -130,7 +130,7 @@ class Trainer:
                 print(f"Epoch {epoch} Training Accuracy: {correct/total}")
                 print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
         else:
-            self.past_classifier = self.classifier
+            self.past_classifier = self.classifier.get_cur_classifer()
             for epoch in range(self.args.epochs_list[self.task_num - 1]):
                 self.classifier.train()
                 correct, total = 0, 0
@@ -160,7 +160,7 @@ class Trainer:
 
                 print(f"Epoch {epoch} Training Accuracy: {correct/total}")
                 print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
-            self.finetuned_classifier = self.classifier
+            self.finetuned_classifier = self.classifier.get_cur_classifer()
             for epoch in range(self.args.epochs_list[self.task_num - 1]):
                 self.classifier = self.past_classifier
                 self.classifier.train()
