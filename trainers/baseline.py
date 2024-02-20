@@ -190,14 +190,14 @@ class Trainer:
                     # replay_reps = self.classifier(torch.tensor(replay_embed).cuda())
                     # replay_embed = torch.cat(replay_embed, dim=0)
                     replay_embed = torch.stack(replay_embed)
-                    print(replay_labels)
+                    # print(replay_labels)
                     # print(replay_embed)
                     # print(len(replay_embed))
-                    print(replay_embed.shape)
-                    # replay_reps = self.classifier(torch.tensor(replay_embed).cuda())
-                    loss_mem = 0
-                    # loss_mem = loss_fct(
-                    #     replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
+                    # print(replay_embed.shape)
+                    replay_reps = self.classifier(torch.tensor(replay_embed).cuda())
+                    # loss_mem = 0
+                    loss_mem = loss_fct(
+                        replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
                     total_loss += loss.item()
                     training_loss = loss + distill_loss + loss_mem
                     training_loss.backward()
@@ -209,7 +209,7 @@ class Trainer:
                     pred = torch.argmax(cur_reps, dim=1)
                     correct += torch.sum(pred == labels).item()
                     total += len(labels)
-                    break
+                    # break
 
                 print(f"Epoch {epoch} Training Accuracy: {correct/total}")
                 print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
