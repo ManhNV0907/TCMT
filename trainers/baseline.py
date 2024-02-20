@@ -4,6 +4,7 @@ from torch import nn
 import copy
 import numpy as np
 from tqdm import tqdm
+from typing import List, Tuple
 from torch.utils.data import DataLoader, ConcatDataset, Subset
 from transformers import get_linear_schedule_with_warmup
 from model.baseline import Encoder, Classifier
@@ -197,8 +198,47 @@ class Trainer:
                     distill_loss_mem = self.distill_loss(
                         replay_reps[:, :self.classifier.old_num_labels], past_replay_reps[:, :self.classifier.old_num_labels])
                     total_loss += loss.item()
-                    training_loss = loss + distill_loss + loss_mem + distill_loss_mem
-                    training_loss.backward()
+                    # Backward and optimize
+                    distill_loss.backward()
+                    distill_shared_grad = []
+                    for param in self.classifier.parameters():
+                        distill_shared_grad.append(param.grad.detach().data.clone().flatten())
+                        param.grad.zero_()
+                    distill_shared_grad = torch.cat(distill_shared_grad, dim=0)
+
+                    loss.backward()
+                    loss_shared_grad = []
+                    for param in self.classifier.parameters():
+                        loss_shared_grad.append(param.grad.detach().data.clone().flatten())
+                        param.grad.zero_()
+                    loss_shared_grad = torch.cat(loss_shared_grad, dim=0)
+
+                    distill_loss_mem.backward()
+                    distill_mem_shared_grad = []
+                    for param in self.classifier.parameters():
+                        distill_mem_shared_grad.append(param.grad.detach().data.clone().flatten())
+                        param.grad.zero_()
+                    distill_mem_shared_grad = torch.cat(distill_shared_grad, dim=0)
+
+                    loss_mem.backward()
+                    loss_mem_shared_grad = []
+                    for param in self.classifier.parameters():
+                        loss_mem_shared_grad.append(param.grad.detach().data.clone().flatten())
+                        param.grad.zero_()
+                    loss_mem_shared_grad = torch.cat(loss_mem_shared_grad, dim=0)
+
+                    shared_grad = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))["updating_grad"]
+
+                    total_length = 0
+                    for param in self.classifier.parameters():
+                        length = param.numel()
+                        param.grad.data = shared_grad[
+                            total_length : total_length + length
+                        ].reshape(param.shape)
+                        total_length += length
+
+                    # training_loss = loss + distill_loss + loss_mem + distill_loss_mem
+                    # training_loss.backward()
                     optimizer.step()
                     scheduler.step()
                     pred = torch.argmax(cur_reps, dim=1)
@@ -287,3 +327,49 @@ def sample_batch(memory, batch_size):
 
   return inputs_batch, labels_batch
 
+def AUGD(grads_list):
+
+    scale_norm_grads1 = {}
+    scale_norm_grads = {}
+    grads = {}
+    norm_grads = {}
+    for i, grad in enumerate(grads_list):
+
+        norm_term = torch.norm(grad)
+
+        grads[i] = grad
+        norm_grads[i] = grad / norm_term
+    for i, g in enumerate(grads_list):
+        if i > 0:
+            scale_norm_grads1[i] = norm_grads[0]*torch.norm(grads[i])
+            scale_norm_grads[i] = norm_grads[i]*torch.norm(grads[0])
+    G = torch.stack(tuple(v for v in grads.values()))
+    U = torch.stack(tuple(v for v in norm_grads.values()))
+    U1 = torch.stack(tuple(v for v in scale_norm_grads1.values()))
+    U2 = torch.stack(tuple(v for v in scale_norm_grads.values()))
+
+    D = G[0, ] - G[1:, ]
+
+    U = (U1-U2)
+    first_element = torch.matmul(
+        G[0, ], U.t(),
+    )
+    try:
+        second_element = torch.inverse(torch.matmul(D, U.t()))
+    except:
+        # workaround for cases where matrix is singular
+        second_element = torch.inverse(
+            torch.eye(len(grads_list) - 1, device=norm_term.device) * 1e-8
+            + torch.matmul(D, U.t())
+        )
+
+    alpha_ = torch.matmul(first_element, second_element)
+    alpha = torch.cat(
+        (torch.tensor(1 - alpha_.sum(), device=norm_term.device).unsqueeze(-1), alpha_)
+    )
+    new_grad =  sum([alpha[i] * grads[i] for i in range(len(grads_list))])
+    new_grad = new_grad*(torch.norm(grads[0])/torch.dot(new_grad,norm_grads[0]))
+    return dict(
+        updating_grad = new_grad,
+        alpha = alpha
+    )
