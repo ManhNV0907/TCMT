@@ -179,7 +179,7 @@ class Trainer:
                         cur_reps[:, self.classifier.old_num_labels:], past_reps[:, self.classifier.old_num_labels:])
                     #Forwar Memory
                     replay_embed, replay_labels = sample_batch(self.past_memory, 32)
-                    replay_labels = replay_labels.cuda()
+                    replay_labels = torch.tensor(replay_labels).cuda()
                     # print(replay_embed[0].shape)
                     print(replay_labels)
                     print(replay_embed)
