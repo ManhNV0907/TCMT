@@ -222,8 +222,9 @@ class Trainer:
                     loss.backward()
                     loss_shared_grad = []
                     for param in self.classifier.parameters():
-                        print(param.grad)
-                        loss_shared_grad.append(param.grad.detach().data.clone().flatten())
+                        if param.grad is None:
+                            print(param.grad)
+                        loss_shared_grad.append(param.grad.data.clone().flatten())
                         param.grad.zero_()
                     loss_shared_grad = torch.cat(loss_shared_grad, dim=0)
 
