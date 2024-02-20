@@ -29,6 +29,7 @@ class Trainer:
 
     def new_task(self, train_dataset, test_dataset, num_labels):
         self.task_num += 1
+        self.past_memory = self.buffer_embedding
         self.curr_label_set = set(train_dataset.labels)
         for i in self.curr_label_set:
             self.buffer_distribution[i] = [] 
@@ -63,7 +64,6 @@ class Trainer:
         new_data = copy.deepcopy(dataset)
         cur_embeding = []
         cur_label = []
-        self.past_memory = self.buffer_embedding
         for idx, batch in enumerate(tqdm(loader, desc=f"Forward current data")):
             
             # print("Forward current data...")
@@ -189,10 +189,11 @@ class Trainer:
                     # print(replay_embed.shape)
                     # replay_reps = self.classifier(torch.tensor(replay_embed).cuda())
                     # replay_embed = torch.cat(replay_embed, dim=0)
+                    replay_embed = torch.stack(replay_embed)
                     print(replay_labels)
                     # print(replay_embed)
-                    print(len(replay_embed))
-                    print(replay_embed[0].shape)
+                    # print(len(replay_embed))
+                    print(replay_embed.shape)
                     # replay_reps = self.classifier(torch.tensor(replay_embed).cuda())
                     loss_mem = 0
                     # loss_mem = loss_fct(
@@ -208,6 +209,7 @@ class Trainer:
                     pred = torch.argmax(cur_reps, dim=1)
                     correct += torch.sum(pred == labels).item()
                     total += len(labels)
+                    break
 
                 print(f"Epoch {epoch} Training Accuracy: {correct/total}")
                 print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
