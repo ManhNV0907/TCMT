@@ -226,7 +226,7 @@ class Trainer:
 
                     total_loss += loss.item()
                     # Backward and optimize
-                    loss.backward()
+                    loss.backward(retain_graph=True)
                     loss_shared_grad = []
                     for name, param in self.classifier.named_parameters():
                         if param.grad is None:
