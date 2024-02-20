@@ -137,19 +137,19 @@ class Classifier(nn.Module):
         self.num_tasks = 0
         # self.old_model = None
         # self.cur_model = None
-        self.head = nn.Sequential(
-            nn.Linear(768, 768, bias=True),
-            nn.ReLU(inplace=True),
-            # nn.Linear(768, 768, bias=True),
-            # nn.ReLU(inplace=True),
-        )
+        # self.head = nn.Sequential(
+        #     nn.Linear(768, 768, bias=True),
+        #     nn.ReLU(inplace=True),
+        #     # nn.Linear(768, 768, bias=True),
+        #     # nn.ReLU(inplace=True),
+        # )
     def get_cur_classifer(self):
         self.cur_model = None
         self.cur_model = deepcopy(self)
         return self.cur_model
 
     def forward(self, x: torch.Tensor):
-        x = self.head(x)
+        # x = self.head(x)
         out = self.top_linear(x)
         return out    
 
