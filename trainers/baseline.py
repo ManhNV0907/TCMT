@@ -166,6 +166,8 @@ class Trainer:
                 self.classifier.train()
                 correct, total = 0, 0
                 total_loss = 0
+                for param in self.classifier.parameters():
+                     param.requires_grad = True
                 for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
                     #Distill current classifier vs finetuned classifier
                     labels = cur_label[idx]
