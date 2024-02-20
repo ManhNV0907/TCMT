@@ -137,40 +137,40 @@ class Trainer:
             # optimizer_tmp = torch.optim.AdamW(self.temp_classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
             # scheduler_tmp = get_linear_schedule_with_warmup(
             #                         optimizer_tmp, num_warmup_steps, num_training_steps)
-            # for epoch in range(self.args.epochs_list[self.task_num - 1]):
-            #     # self.classifier.train()
-            #     self.temp_classifier.train()
-            #     correct, total = 0, 0
-            #     total_loss = 0
-            #     for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
-            #         #Finetune classifier on current data
-            #         # _, _, labels = batch
-            #         labels = cur_label[idx]
-            #         labels = labels.cuda()
-            #         # print(labels)
-            #         optimizer.zero_grad()
-            #         # logits = self.classifier(cur_embeding[idx].cuda())
-            #         logits = self.temp_classifier(cur_embeding[idx].cuda())
-            #         logits[:, :self.classifier.old_num_labels] = -1e4
-            #         loss_fct = nn.CrossEntropyLoss()
-            #         loss = loss_fct(
-            #             logits.view(-1, logits.shape[-1]), labels.view(-1))
-            #         total_loss += loss.item()
-            #         loss.backward()
-            #         optimizer_tmp.step()
-            #         scheduler_tmp.step()
-            #         # _, _, labels = batch
-            #         # print(labels)
-            #         # labels = labels.cuda()
-            #         pred = torch.argmax(logits, dim=1)
-            #         correct += torch.sum(pred == labels).item()
-            #         total += len(labels)
+            for epoch in range(self.args.epochs_list[self.task_num - 1]):
+                self.classifier.train()
+                # self.temp_classifier.train()
+                correct, total = 0, 0
+                total_loss = 0
+                for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
+                    #Finetune classifier on current data
+                    # _, _, labels = batch
+                    labels = cur_label[idx]
+                    labels = labels.cuda()
+                    # print(labels)
+                    optimizer.zero_grad()
+                    logits = self.classifier(cur_embeding[idx].cuda())
+                    # logits = self.temp_classifier(cur_embeding[idx].cuda())
+                    logits[:, :self.classifier.old_num_labels] = -1e4
+                    loss_fct = nn.CrossEntropyLoss()
+                    loss = loss_fct(
+                        logits.view(-1, logits.shape[-1]), labels.view(-1))
+                    total_loss += loss.item()
+                    loss.backward()
+                    optimizer.step()
+                    scheduler.step()
+                    # _, _, labels = batch
+                    # print(labels)
+                    # labels = labels.cuda()
+                    pred = torch.argmax(logits, dim=1)
+                    correct += torch.sum(pred == labels).item()
+                    total += len(labels)
 
-            #     print(f"Epoch {epoch} Training Accuracy: {correct/total}")
-            #     print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
-            # self.finetuned_classifier = self.temp_classifier.get_cur_classifer()
+                print(f"Epoch {epoch} Training Accuracy: {correct/total}")
+                print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
+            self.finetuned_classifier = self.temp_classifier.get_cur_classifer()
 
-            # self.classifier = self.past_classifier
+            self.classifier = self.past_classifier
             # optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
             # scheduler = get_linear_schedule_with_warmup(
             #                         optimizer, num_warmup_steps, num_training_steps)
@@ -190,20 +190,20 @@ class Trainer:
                     cur_reps[:,:self.classifier.old_num_labels] = -1e4
                     
                     # print(cur_reps)
-                    # with torch.no_grad():
-                    #     past_reps = self.finetuned_classifier(cur_embeding[idx].cuda())
-                    # past_reps[:,:self.classifier.old_num_labels] = -1e4
+                    with torch.no_grad():
+                        past_reps = self.finetuned_classifier(cur_embeding[idx].cuda())
+                    past_reps[:,:self.classifier.old_num_labels] = -1e4
 
                     # print(past_reps)
                     # loss components
 
                     loss_fct = nn.CrossEntropyLoss()
-                    # loss = loss_fct(
-                    #     cur_reps.view(-1, cur_reps.shape[-1]), labels.view(-1))
-                    loss = F.cross_entropy(cur_reps.view(-1, cur_reps.shape[-1]), labels.view(-1), reduction="mean")
-                    print(loss.item())
-                    # distill_loss = self.distill_loss(
-                    #     cur_reps[:, self.classifier.old_num_labels:], past_reps[:, self.classifier.old_num_labels:])
+                    loss = loss_fct(
+                        cur_reps.view(-1, cur_reps.shape[-1]), labels.view(-1))
+                    # loss = F.cross_entropy(cur_reps.view(-1, cur_reps.shape[-1]), labels.view(-1), reduction="mean")
+                    # print(loss.item())
+                    distill_loss = self.distill_loss(
+                        cur_reps[:, self.classifier.old_num_labels:], past_reps[:, self.classifier.old_num_labels:])
                     #Forwar Memory
                     replay_embed, replay_labels = sample_batch(self.past_memory, 64)
                     replay_labels = torch.tensor(replay_labels).cuda()
@@ -233,13 +233,17 @@ class Trainer:
                         param.grad.zero_()
                     loss_shared_grad = torch.cat(loss_shared_grad, dim=0)
 
-                    # distill_loss.backward()
-                    # distill_shared_grad = []
-                    # for param in self.classifier.parameters():
-                    #     print(param.grad)
-                    #     distill_shared_grad.append(param.grad.detach().data.clone().flatten())
-                    #     param.grad.zero_()
-                    # distill_shared_grad = torch.cat(distill_shared_grad, dim=0)
+                    distill_loss.backward()
+                    distill_shared_grad = []
+                    for name, param in self.classifier.named_parameters():
+                        if param.grad is None:
+                            # print(param.grad)
+                            # print(name)
+                            continue
+                        else:
+                            distill_shared_grad.append(param.grad.detach().data.clone().flatten())
+                        param.grad.zero_()
+                    distill_shared_grad = torch.cat(distill_shared_grad, dim=0)
 
                     distill_loss_mem.backward(retain_graph=True)
                     distill_mem_shared_grad = []
@@ -265,8 +269,8 @@ class Trainer:
                         param.grad.zero_()
                     loss_mem_shared_grad = torch.cat(loss_mem_shared_grad, dim=0)
 
-                    # shared_grad = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))["updating_grad"]
-                    shared_grad = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))["updating_grad"]
+                    shared_grad = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))["updating_grad"]
+                    # shared_grad = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))["updating_grad"]
 
                     total_length = 0
                     for name, param in self.classifier.named_parameters():
