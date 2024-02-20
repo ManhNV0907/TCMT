@@ -198,7 +198,7 @@ class Trainer:
                     # loss_mem = 0
                     loss_mem = loss_fct(
                         replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
-                    total_loss += loss.item()
+                    # total_loss += loss.item()
                     training_loss = loss + distill_loss + loss_mem
                     training_loss.backward()
                     optimizer.step()
@@ -212,7 +212,7 @@ class Trainer:
                     # break
 
                 print(f"Epoch {epoch} Training Accuracy: {correct/total}")
-                print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
+                # print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
 
 
 
