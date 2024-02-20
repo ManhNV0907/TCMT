@@ -178,7 +178,8 @@ class Trainer:
                     cur_reps[:,:self.classifier.old_num_labels] = -1e4
                     
                     # print(cur_reps)
-                    past_reps = self.finetuned_classifier(cur_embeding[idx].cuda())
+                    with torch.no_grad():
+                        past_reps = self.finetuned_classifier(cur_embeding[idx].cuda())
                     past_reps[:,:self.classifier.old_num_labels] = -1e4
                     # print(past_reps)
                     # loss components
@@ -193,7 +194,8 @@ class Trainer:
                     replay_embed = torch.stack(replay_embed)
                     replay_reps = self.classifier(replay_embed.cuda())
                     replay_reps[:,self.classifier.old_num_labels:] = -1e4
-                    past_replay_reps = self.past_classifier(replay_embed.cuda())
+                    with torch.no_grad():
+                        past_replay_reps = self.past_classifier(replay_embed.cuda())
                     past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     loss_mem = loss_fct(
                         replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
