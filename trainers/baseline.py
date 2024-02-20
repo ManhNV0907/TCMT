@@ -133,7 +133,7 @@ class Trainer:
                 print(f"Epoch {epoch} Training Accuracy: {correct/total}")
                 print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
         else:
-            # self.past_classifier = self.classifier.get_cur_classifer()
+            self.past_classifier = self.classifier.get_cur_classifer()
             # optimizer_tmp = torch.optim.AdamW(self.temp_classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
             # scheduler_tmp = get_linear_schedule_with_warmup(
             #                         optimizer_tmp, num_warmup_steps, num_training_steps)
@@ -240,7 +240,7 @@ class Trainer:
                     for param in self.classifier.parameters():
                         distill_mem_shared_grad.append(param.grad.detach().data.clone().flatten())
                         param.grad.zero_()
-                    distill_mem_shared_grad = torch.cat(distill_shared_grad, dim=0)
+                    distill_mem_shared_grad = torch.cat(distill_mem_shared_grad, dim=0)
 
                     loss_mem.backward()
                     loss_mem_shared_grad = []
