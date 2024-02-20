@@ -219,7 +219,7 @@ class Trainer:
                         replay_reps[:, :self.classifier.old_num_labels], past_replay_reps[:, :self.classifier.old_num_labels])
                     total_loss += loss.item()
                     # Backward and optimize
-                    loss.backward()
+                    loss.backward(retain_graph=True)
                     loss_shared_grad = []
                     for name, param in self.classifier.named_parameters():
                         if param.grad is None:
@@ -241,7 +241,7 @@ class Trainer:
                     #     param.grad.zero_()
                     # distill_shared_grad = torch.cat(distill_shared_grad, dim=0)
 
-                    distill_loss_mem.backward()
+                    distill_loss_mem.backward(retain_graph=True)
                     distill_mem_shared_grad = []
                     for name, param in self.classifier.named_parameters():
                         if param.grad is None:
@@ -269,12 +269,13 @@ class Trainer:
                     shared_grad = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))["updating_grad"]
 
                     total_length = 0
-                    for param in self.classifier.parameters():
-                        length = param.numel()
-                        param.grad.data = shared_grad[
-                            total_length : total_length + length
-                        ].reshape(param.shape)
-                        total_length += length
+                    for name, param in self.classifier.named_parameters():
+                        if 'cur' not in name:
+                            length = param.numel()
+                            param.grad.data = shared_grad[
+                                total_length : total_length + length
+                            ].reshape(param.shape)
+                            total_length += length
 
                     # training_loss = loss + distill_loss + loss_mem + distill_loss_mem
                     # training_loss.backward()
