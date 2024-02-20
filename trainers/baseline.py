@@ -89,7 +89,8 @@ class Trainer:
             self.key_mixture[label].weights_[0] = 1.0
         #Sample prelogits 
         for i, label in enumerate(self.curr_label_set):
-            replay_embedding =  self.key_mixture[label].sample(100 * 256).astype("float32")
+            replay_embedding =  self.key_mixture[label].sample(100 * 256)
+            # .astype("float32")
             self.buffer_embedding[label].append(replay_embedding)
         
         # if self.task_num > 1:
