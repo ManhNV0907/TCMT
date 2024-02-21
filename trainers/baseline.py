@@ -243,10 +243,14 @@ class Trainer:
 
                     # shared_grad = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))["updating_grad"]
                     mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
-                    # mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad]))
+
+                    # if torch.norm(distill_mem_shared_grad) > 0.1:
+                    #     mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
+                    # else:
+                    #     mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad]))
 
                     shared_grad = mtl_output["updating_grad"]
-                    # print("Alpha: ", mtl_output["alpha"])
+                    print("Alpha: ", mtl_output["alpha"])
                     # print("Norm_grad", mtl_output["norm_grads"])
 
                     
@@ -377,7 +381,8 @@ def AUGD(grads_list):
         norm_grads[i] = grad / norm_term
         norms[i] = norm_term
     if norms[3] < 0.01:
-        grads_list = grads_list[:3]
+        norms[3] = 0.01
+        # grads_list = grads_list[:3]
 
     for i, g in enumerate(grads_list):
         if i > 0:
