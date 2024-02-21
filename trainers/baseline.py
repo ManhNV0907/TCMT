@@ -274,7 +274,7 @@ class Trainer:
                     total += len(cur_labels)
                     total_loss += loss.item()
                     total_distill_loss += distill_loss.item()
-                    # total_distill_loss_mem += distill_loss_mem.item()
+                    total_distill_loss_mem += distill_loss_mem.item()
                     total_loss_mem += loss_mem.item()
                     
 
