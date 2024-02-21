@@ -171,29 +171,9 @@ class Trainer:
                     cur_embed = torch.stack(cur_embed)
                     cur_reps = self.classifier(cur_embed.cuda())
                     # cur_reps[:,:self.classifier.old_num_labels] = -1e4
-                    with torch.no_grad():
-                        past_reps = self.finetuned_classifier(cur_embed.cuda())
-                    # past_reps[:,:self.classifier.old_num_labels] = -1e4
                     loss_fct = nn.CrossEntropyLoss()
                     loss = loss_fct(
                         cur_reps.view(-1, cur_reps.shape[-1]), cur_labels.view(-1))
-                    distill_loss = self.distill_loss(
-                        cur_reps, past_reps) 
-                    #Forwar Memory
-                    replay_embed, replay_labels = sample_batch(self.past_memory, 32, self.past_label_set)
-                    replay_labels = torch.tensor(replay_labels).cuda()
-                    replay_embed = torch.stack(replay_embed)
-                    replay_reps = self.classifier(replay_embed.cuda())
-                    # replay_reps[:,self.classifier.old_num_labels:] = -1e4
-                    with torch.no_grad():
-                        past_replay_reps = self.past_classifier(replay_embed.cuda())
-                    # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
-                    loss_mem = loss_fct(
-                        replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
-                    distill_loss_mem = self.distill_loss(
-                        replay_reps, past_replay_reps)
-
-                    total_loss += loss.item()
                     # Backward and optimize
                     loss.backward(retain_graph=True)
                     loss_shared_grad = []
@@ -205,7 +185,12 @@ class Trainer:
                         param.grad.zero_()
                     loss_shared_grad = torch.cat(loss_shared_grad, dim=0)
 
-                    distill_loss.backward(retain_graph=True)
+                    with torch.no_grad():
+                        past_reps = self.finetuned_classifier(cur_embed.cuda())
+                    # past_reps[:,:self.classifier.old_num_labels] = -1e4
+                    distill_loss = self.distill_loss(
+                        cur_reps, past_reps) 
+                    distill_loss.backward()
                     distill_shared_grad = []
                     for name, param in self.classifier.named_parameters():
                         if param.grad is None:
@@ -215,7 +200,30 @@ class Trainer:
                         param.grad.zero_()
                     distill_shared_grad = torch.cat(distill_shared_grad, dim=0)
 
-                    distill_loss_mem.backward(retain_graph=True)
+                    #Forwar Memory
+                    replay_embed, replay_labels = sample_batch(self.past_memory, 32, self.past_label_set)
+                    replay_labels = torch.tensor(replay_labels).cuda()
+                    replay_embed = torch.stack(replay_embed)
+                    replay_reps = self.classifier(replay_embed.cuda())
+                    # replay_reps[:,self.classifier.old_num_labels:] = -1e4
+                    loss_mem = loss_fct(
+                        replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
+                    loss_mem.backward(retain_graph=True)
+                    loss_mem_shared_grad = []
+                    for name, param in self.classifier.named_parameters():
+                        if param.grad is None:
+                            continue
+                        else:
+                            loss_mem_shared_grad.append(param.grad.detach().data.clone().flatten())
+                        param.grad.zero_()
+                    loss_mem_shared_grad = torch.cat(loss_mem_shared_grad, dim=0)
+
+                    with torch.no_grad():
+                        past_replay_reps = self.past_classifier(replay_embed.cuda())
+                    # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
+                    distill_loss_mem = self.distill_loss(
+                        replay_reps, past_replay_reps)
+                    distill_loss_mem.backward()
                     distill_mem_shared_grad = []
                     for name, param in self.classifier.named_parameters():
                         if param.grad is None:
@@ -225,15 +233,7 @@ class Trainer:
                         param.grad.zero_()
                     distill_mem_shared_grad = torch.cat(distill_mem_shared_grad, dim=0)
 
-                    loss_mem.backward()
-                    loss_mem_shared_grad = []
-                    for name, param in self.classifier.named_parameters():
-                        if param.grad is None:
-                            continue
-                        else:
-                            loss_mem_shared_grad.append(param.grad.detach().data.clone().flatten())
-                        param.grad.zero_()
-                    loss_mem_shared_grad = torch.cat(loss_mem_shared_grad, dim=0)
+
 
                     # shared_grad = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))["updating_grad"]
                     mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
@@ -259,6 +259,7 @@ class Trainer:
                     pred = torch.argmax(cur_reps, dim=1)
                     correct += torch.sum(pred == cur_labels).item()
                     total += len(cur_labels)
+                    total_loss += loss.item()
                     total_distill_loss += distill_loss.item()
                     total_distill_loss_mem += distill_loss_mem.item()
                     total_loss_mem += loss_mem.item()
