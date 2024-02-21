@@ -223,10 +223,10 @@ class Trainer:
                     loss_mem_shared_grad = torch.cat(loss_mem_shared_grad, dim=0)
 
                     replay_reps = self.classifier(replay_embed.cuda())
-                    replay_reps[:,self.classifier.old_num_labels:] = -1e4
+                    # replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     with torch.no_grad():
                         past_replay_reps = self.past_classifier(replay_embed.cuda())
-                    past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
+                    # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     distill_loss_mem = self.distill_loss(
                         replay_reps, past_replay_reps)
                     distill_loss_mem.backward()
@@ -246,8 +246,8 @@ class Trainer:
                     # mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad]))
 
                     shared_grad = mtl_output["updating_grad"]
-                    print("Alpha: ", mtl_output["alpha"])
-                    print("Norm_grad", mtl_output["norm_grads"])
+                    # print("Alpha: ", mtl_output["alpha"])
+                    # print("Norm_grad", mtl_output["norm_grads"])
 
                     
                     total_length = 0
@@ -405,7 +405,7 @@ def AUGD(grads_list):
         (torch.tensor(1 - alpha_.sum(), device=norm_term.device).unsqueeze(-1), alpha_)
     )
     new_grad =  sum([alpha[i] * grads[i] for i in range(len(grads_list))])
-    new_grad = new_grad*(torch.norm(grads[0])/torch.dot(new_grad,norm_grads[0]))
+    # new_grad = new_grad*(torch.norm(grads[0])/torch.dot(new_grad,norm_grads[0]))
     return dict(
         updating_grad = new_grad,
         alpha = alpha,
