@@ -175,7 +175,7 @@ class Trainer:
                     cur_reps[:,:self.classifier.old_num_labels] = -1e4
                     loss_fct = nn.CrossEntropyLoss()
                     loss = loss_fct(
-                        cur_reps.view(-1, cur_reps.shape[-1]), cur_labels.view(-1))
+                        cur_reps.view(-1, cur_reps.shape[-1]), cur_labels.view(-1))*10000000
                     # Backward and optimize
                     loss.backward()
                     loss_shared_grad = []
@@ -193,7 +193,7 @@ class Trainer:
                         past_reps = self.finetuned_classifier(cur_embed.cuda())
                     past_reps[:,:self.classifier.old_num_labels] = -1e4
                     distill_loss = self.distill_loss(
-                        cur_reps, past_reps) 
+                        cur_reps, past_reps)*10000000 
                     distill_loss.backward()
                     distill_shared_grad = []
                     for name, param in self.classifier.named_parameters():
@@ -211,7 +211,7 @@ class Trainer:
                     replay_reps = self.classifier(replay_embed.cuda())
                     replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     loss_mem = loss_fct(
-                        replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
+                        replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))*10000000
                     loss_mem.backward()
                     loss_mem_shared_grad = []
                     for name, param in self.classifier.named_parameters():
@@ -228,7 +228,7 @@ class Trainer:
                         past_replay_reps = self.past_classifier(replay_embed.cuda())
                     # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     distill_loss_mem = self.distill_loss(
-                        replay_reps, past_replay_reps)*100000
+                        replay_reps, past_replay_reps)*10000000
                     distill_loss_mem.backward()
                     distill_mem_shared_grad = []
                     for name, param in self.classifier.named_parameters():
