@@ -220,27 +220,29 @@ class Trainer:
                         param.grad.zero_()
                     loss_mem_shared_grad = torch.cat(loss_mem_shared_grad, dim=0)
 
-                    replay_reps = self.classifier(replay_embed.cuda())
-                    replay_reps[:,self.classifier.old_num_labels:] = -1e4
-                    with torch.no_grad():
-                        past_replay_reps = self.past_classifier(replay_embed.cuda())
-                    past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
-                    distill_loss_mem = self.distill_loss(
-                        replay_reps, past_replay_reps)
-                    distill_loss_mem.backward()
-                    distill_mem_shared_grad = []
-                    for name, param in self.classifier.named_parameters():
-                        if param.grad is None:
-                            continue
-                        else:
-                            distill_mem_shared_grad.append(param.grad.detach().data.clone().flatten())
-                        param.grad.zero_()
-                    distill_mem_shared_grad = torch.cat(distill_mem_shared_grad, dim=0)
+                    # replay_reps = self.classifier(replay_embed.cuda())
+                    # replay_reps[:,self.classifier.old_num_labels:] = -1e4
+                    # with torch.no_grad():
+                    #     past_replay_reps = self.past_classifier(replay_embed.cuda())
+                    # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
+                    # distill_loss_mem = self.distill_loss(
+                    #     replay_reps, past_replay_reps)
+                    # distill_loss_mem.backward()
+                    # distill_mem_shared_grad = []
+                    # for name, param in self.classifier.named_parameters():
+                    #     if param.grad is None:
+                    #         continue
+                    #     else:
+                    #         distill_mem_shared_grad.append(param.grad.detach().data.clone().flatten())
+                    #     param.grad.zero_()
+                    # distill_mem_shared_grad = torch.cat(distill_mem_shared_grad, dim=0)
 
 
 
                     # shared_grad = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))["updating_grad"]
-                    mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
+                    # mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
+                    mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad]))
+
                     shared_grad = mtl_output["updating_grad"]
                     print("Alpha: ", mtl_output["alpha"])
 
@@ -265,7 +267,7 @@ class Trainer:
                     total += len(cur_labels)
                     total_loss += loss.item()
                     total_distill_loss += distill_loss.item()
-                    total_distill_loss_mem += distill_loss_mem.item()
+                    # total_distill_loss_mem += distill_loss_mem.item()
                     total_loss_mem += loss_mem.item()
                     
 
