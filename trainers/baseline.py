@@ -121,7 +121,7 @@ class Trainer:
         else:
             self.past_classifier = self.classifier.get_cur_classifer()
             self.classifier.train()
-            for epoch in range(10):
+            for epoch in range(20):
                 
                 correct, total = 0, 0
                 total_loss = 0
@@ -166,7 +166,7 @@ class Trainer:
                 for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
                     #Distill current classifier vs finetuned classifier
                     optimizer.zero_grad()
-                    cur_embed, cur_labels = sample_batch(self.buffer_embedding, 64, self.curr_label_set)
+                    cur_embed, cur_labels = sample_batch(self.buffer_embedding, 32, self.curr_label_set)
                     cur_labels = torch.tensor(cur_labels).cuda()
                     cur_embed = torch.stack(cur_embed)
                     cur_reps = self.classifier(cur_embed.cuda())
@@ -180,7 +180,7 @@ class Trainer:
                     distill_loss = self.distill_loss(
                         cur_reps, past_reps) 
                     #Forwar Memory
-                    replay_embed, replay_labels = sample_batch(self.past_memory, 64, self.past_label_set)
+                    replay_embed, replay_labels = sample_batch(self.past_memory, 32, self.past_label_set)
                     replay_labels = torch.tensor(replay_labels).cuda()
                     replay_embed = torch.stack(replay_embed)
                     replay_reps = self.classifier(replay_embed.cuda())
@@ -256,7 +256,7 @@ class Trainer:
                     #         ].reshape(param.shape)
                     #         total_length += length
 
-                    training_loss = 5*loss + 2*distill_loss + 15*loss_mem + 15*distill_loss_mem
+                    training_loss = loss + distill_loss + 15*loss_mem + 15*distill_loss_mem
                     # training_loss = 0.2*loss + 0.3*distill_loss + 0.5*distill_loss_mem
                     # training_loss = 0.2*loss + 0.3*distill_loss + 0.5*loss_mem
                     training_loss.backward()
