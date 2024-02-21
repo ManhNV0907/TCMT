@@ -376,9 +376,9 @@ def AUGD(grads_list):
     for i, grad in enumerate(grads_list):
 
         norm_term = torch.norm(grad)
-        if norm_term<-1e4:
-            norm_term = -1e4
-            grad = grad * (-1e4)/norm_term
+        if norm_term<0.01:
+            norm_term = 0.01
+            grad = grad * (0.01)/norm_term
             grads_list[i] = grad
 
         grads[i] = grad
