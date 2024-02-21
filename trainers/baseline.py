@@ -377,6 +377,10 @@ def AUGD(grads_list):
         norm_grads[i] = grad / norm_term
         norms[i] = norm_term
     for i, g in enumerate(grads_list):
+        if norms[i] < 0.01:
+            grads_list.remove(grads_list[i])
+
+    for i, g in enumerate(grads_list):
         if i > 0:
             scale_norm_grads1[i] = norm_grads[0]*torch.norm(grads[i])
             scale_norm_grads[i] = norm_grads[i]*torch.norm(grads[0])
@@ -405,7 +409,7 @@ def AUGD(grads_list):
         (torch.tensor(1 - alpha_.sum(), device=norm_term.device).unsqueeze(-1), alpha_)
     )
     new_grad =  sum([alpha[i] * grads[i] for i in range(len(grads_list))])
-    # new_grad = new_grad*(torch.norm(grads[0])/torch.dot(new_grad,norm_grads[0]))
+    new_grad = new_grad*(torch.norm(grads[0])/torch.dot(new_grad,norm_grads[0]))
     return dict(
         updating_grad = new_grad,
         alpha = alpha,
