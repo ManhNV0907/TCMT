@@ -102,8 +102,9 @@ class Trainer:
         # if self.task_num > 1:
         #     self.past_classifier = copy.deepcopy(self)
         if self.task_num ==1:
+            self.classifier.train()
             for epoch in range(self.args.epochs_list[self.task_num - 1]):
-                self.classifier.train()
+                
                 correct, total = 0, 0
                 total_loss = 0
                 for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
@@ -137,8 +138,9 @@ class Trainer:
             # optimizer_tmp = torch.optim.AdamW(self.temp_classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
             # scheduler_tmp = get_linear_schedule_with_warmup(
             #                         optimizer_tmp, num_warmup_steps, num_training_steps)
-            for epoch in range(self.args.epochs_list[self.task_num - 1]):
-                self.classifier.train()
+            self.classifier.train()
+            for epoch in range(30):
+                
                 # self.temp_classifier.train()
                 correct, total = 0, 0
                 total_loss = 0
@@ -168,16 +170,22 @@ class Trainer:
 
                 print(f"Epoch {epoch} Training Accuracy: {correct/total}")
                 print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
-            self.finetuned_classifier = self.temp_classifier.get_cur_classifer()
+            self.finetuned_classifier = self.classifier.get_cur_classifer()
 
             self.classifier = self.past_classifier
             optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
             scheduler = get_linear_schedule_with_warmup(
                                     optimizer, num_warmup_steps, num_training_steps)
+            self.classifier.train()
+            self.finetuned_classifier.eval()
+            self.past_classifier.eval()
             for epoch in range(self.args.epochs_list[self.task_num - 1]):
-                self.classifier.train()
+
                 correct, total = 0, 0
                 total_loss = 0
+                total_distill_loss = 0
+                total_distill_loss_mem = 0
+                total_loss_mem = 0
                 # for param in self.classifier.parameters():
                 #      param.requires_grad = True
                 for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
@@ -185,31 +193,18 @@ class Trainer:
                     labels = cur_label[idx]
                     labels = labels.cuda()
                     optimizer.zero_grad()
-                    # print(cur_embeding[idx])
                     cur_reps = self.classifier(cur_embeding[idx].cuda())
                     # cur_reps[:,:self.classifier.old_num_labels] = -1e4
-                    
-                    # print(cur_reps)
                     with torch.no_grad():
                         past_reps = self.finetuned_classifier(cur_embeding[idx].cuda())
                     # past_reps[:,:self.classifier.old_num_labels] = -1e4
-
-                    # print(past_reps)
-                    # loss components
-
                     loss_fct = nn.CrossEntropyLoss()
                     loss = loss_fct(
                         cur_reps.view(-1, cur_reps.shape[-1]), labels.view(-1))
-                    # loss = F.cross_entropy(cur_reps.view(-1, cur_reps.shape[-1]), labels.view(-1), reduction="mean")
-                    # print(loss.item())
-
-                    # distill_loss = self.distill_loss(
-                    #     cur_reps[:, self.classifier.old_num_labels:], past_reps[:, self.classifier.old_num_labels:])
                     distill_loss = self.distill_loss(
                         cur_reps, past_reps) 
-                       
                     #Forwar Memory
-                    replay_embed, replay_labels = sample_batch(self.past_memory, 32)
+                    replay_embed, replay_labels = sample_batch(self.past_memory, 512)
                     replay_labels = torch.tensor(replay_labels).cuda()
                     replay_embed = torch.stack(replay_embed)
                     replay_reps = self.classifier(replay_embed.cuda())
@@ -219,8 +214,6 @@ class Trainer:
                     # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     loss_mem = loss_fct(
                         replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
-                    # distill_loss_mem = self.distill_loss(
-                    #     replay_reps[:, :self.classifier.old_num_labels], past_replay_reps[:, :self.classifier.old_num_labels])
                     distill_loss_mem = self.distill_loss(
                         replay_reps, past_replay_reps)
 
@@ -287,17 +280,26 @@ class Trainer:
                     #         ].reshape(param.shape)
                     #         total_length += length
 
-                    training_loss = loss + distill_loss + loss_mem + distill_loss_mem
+                    training_loss = 5*loss + 2*distill_loss + loss_mem + distill_loss_mem
+                    # training_loss = 0.2*loss + 0.3*distill_loss + 0.5*distill_loss_mem
+                    # training_loss = 0.2*loss + 0.3*distill_loss + 0.5*loss_mem
                     training_loss.backward()
                     optimizer.step()
                     scheduler.step()
                     pred = torch.argmax(cur_reps, dim=1)
                     correct += torch.sum(pred == labels).item()
                     total += len(labels)
+                    total_distill_loss += distill_loss.item()
+                    total_distill_loss_mem += distill_loss_mem.item()
+                    total_loss_mem += loss_mem.item()
                     
 
                 print(f"Epoch {epoch} Training Accuracy: {correct/total}")
                 print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
+                print(f"Epoch {epoch} Average mem_Loss: {total_loss_mem/len(loader)}")
+                print(f"Epoch {epoch} Average total_distill_loss_mem: {total_distill_loss_mem/len(loader)}")
+                print(f"Epoch {epoch} Average total_distill_loss: {total_distill_loss/len(loader)}")
+
 
 
 
@@ -371,6 +373,8 @@ def sample_batch(memory, batch_size):
     label = random.choice(labels)
 
     input_ids = random.choice(memory[label][0])
+    # print(label)
+    # print(memory[label][0])
 
     inputs_batch.append(input_ids)
     labels_batch.append(label)
