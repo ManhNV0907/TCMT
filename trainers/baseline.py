@@ -139,7 +139,7 @@ class Trainer:
             # scheduler_tmp = get_linear_schedule_with_warmup(
             #                         optimizer_tmp, num_warmup_steps, num_training_steps)
             self.classifier.train()
-            for epoch in range(30):
+            for epoch in range(10):
                 
                 # self.temp_classifier.train()
                 correct, total = 0, 0
@@ -280,7 +280,7 @@ class Trainer:
                     #         ].reshape(param.shape)
                     #         total_length += length
 
-                    training_loss = 5*loss + 2*distill_loss + loss_mem + distill_loss_mem
+                    training_loss = 5*loss + 2*distill_loss + 0.5*loss_mem + 0.5*distill_loss_mem
                     # training_loss = 0.2*loss + 0.3*distill_loss + 0.5*distill_loss_mem
                     # training_loss = 0.2*loss + 0.3*distill_loss + 0.5*loss_mem
                     training_loss.backward()
