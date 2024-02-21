@@ -228,7 +228,7 @@ class Trainer:
                         past_replay_reps = self.past_classifier(replay_embed.cuda())
                     # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     distill_loss_mem = self.distill_loss(
-                        replay_reps, past_replay_reps)
+                        replay_reps, past_replay_reps)*100000
                     distill_loss_mem.backward()
                     distill_mem_shared_grad = []
                     for name, param in self.classifier.named_parameters():
@@ -376,10 +376,10 @@ def AUGD(grads_list):
     for i, grad in enumerate(grads_list):
 
         norm_term = torch.norm(grad)
-        if norm_term<0.01:
-            grad = grad * (0.01)/norm_term
-            norm_term = torch.norm(grad)
-            grads_list[i] = grad
+        # if norm_term<0.01:
+        #     grad = grad * (0.01)/norm_term
+        #     norm_term = torch.norm(grad)
+        #     grads_list[i] = grad
 
         grads[i] = grad
         norm_grads[i] = grad / norm_term
