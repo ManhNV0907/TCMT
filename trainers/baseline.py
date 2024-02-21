@@ -23,7 +23,6 @@ class Trainer:
         # Classifier
         self.encoder = Encoder(args)
         self.classifier = Classifier(args)
-        self.temp_classifier = Classifier(args)
         self.buffer_distribution = {}
         self.key_mixture = {}
         self.buffer_embedding = {}
@@ -41,7 +40,6 @@ class Trainer:
             self.buffer_embedding[i] = []
         # expand classifier and prefix
         self.classifier.new_task(num_labels)
-        self.temp_classifier.new_task(num_labels)
         # train classifier with new dataset
         self.training(train_dataset)
         # evaluating
@@ -60,7 +58,6 @@ class Trainer:
             optimizer, num_warmup_steps, num_training_steps)
         self.encoder.cuda()
         self.classifier.cuda()
-        self.temp_classifier.cuda()
 
         cur_embeding = []
         cur_label = []
@@ -126,7 +123,6 @@ class Trainer:
             self.classifier.train()
             for epoch in range(10):
                 
-                # self.temp_classifier.train()
                 correct, total = 0, 0
                 total_loss = 0
                 for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
@@ -344,6 +340,7 @@ class Trainer:
 def sample_batch(memory, batch_size, labels):
 
 #   labels = list(memory.keys())
+  labels = list(labels)
 
 #   num_inputs_ids = len(memory[labels[0]])
   inputs_batch = []
