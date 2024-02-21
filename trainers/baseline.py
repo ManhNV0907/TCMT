@@ -175,7 +175,7 @@ class Trainer:
                     loss = loss_fct(
                         cur_reps.view(-1, cur_reps.shape[-1]), cur_labels.view(-1))
                     # Backward and optimize
-                    loss.backward(retain_graph=True)
+                    loss.backward()
                     loss_shared_grad = []
                     for name, param in self.classifier.named_parameters():
                         if param.grad is None:
@@ -185,6 +185,7 @@ class Trainer:
                         param.grad.zero_()
                     loss_shared_grad = torch.cat(loss_shared_grad, dim=0)
 
+                    cur_reps = self.classifier(cur_embed.cuda())
                     with torch.no_grad():
                         past_reps = self.finetuned_classifier(cur_embed.cuda())
                     # past_reps[:,:self.classifier.old_num_labels] = -1e4
@@ -208,7 +209,7 @@ class Trainer:
                     # replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     loss_mem = loss_fct(
                         replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
-                    loss_mem.backward(retain_graph=True)
+                    loss_mem.backward()
                     loss_mem_shared_grad = []
                     for name, param in self.classifier.named_parameters():
                         if param.grad is None:
@@ -218,6 +219,7 @@ class Trainer:
                         param.grad.zero_()
                     loss_mem_shared_grad = torch.cat(loss_mem_shared_grad, dim=0)
 
+                    replay_reps = self.classifier(replay_embed.cuda())
                     with torch.no_grad():
                         past_replay_reps = self.past_classifier(replay_embed.cuda())
                     # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
