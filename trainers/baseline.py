@@ -120,6 +120,7 @@ class Trainer:
                 print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
         else:
             self.past_classifier = self.classifier.get_cur_classifer()
+            self.past_classifier.cuda()
             self.classifier.train()
             for epoch in range(20):
                 
@@ -148,6 +149,7 @@ class Trainer:
                 print(f"Epoch {epoch} Training Accuracy: {correct/total}")
                 print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
             self.finetuned_classifier = self.classifier.get_cur_classifer()
+            self.finetuned_classifier.cuda()
 
             self.classifier = self.past_classifier
             optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
@@ -220,31 +222,32 @@ class Trainer:
                         param.grad.zero_()
                     loss_mem_shared_grad = torch.cat(loss_mem_shared_grad, dim=0)
 
-                    # replay_reps = self.classifier(replay_embed.cuda())
-                    # replay_reps[:,self.classifier.old_num_labels:] = -1e4
-                    # with torch.no_grad():
-                    #     past_replay_reps = self.past_classifier(replay_embed.cuda())
-                    # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
-                    # distill_loss_mem = self.distill_loss(
-                    #     replay_reps, past_replay_reps)
-                    # distill_loss_mem.backward()
-                    # distill_mem_shared_grad = []
-                    # for name, param in self.classifier.named_parameters():
-                    #     if param.grad is None:
-                    #         continue
-                    #     else:
-                    #         distill_mem_shared_grad.append(param.grad.detach().data.clone().flatten())
-                    #     param.grad.zero_()
-                    # distill_mem_shared_grad = torch.cat(distill_mem_shared_grad, dim=0)
+                    replay_reps = self.classifier(replay_embed.cuda())
+                    replay_reps[:,self.classifier.old_num_labels:] = -1e4
+                    with torch.no_grad():
+                        past_replay_reps = self.past_classifier(replay_embed.cuda())
+                    past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
+                    distill_loss_mem = self.distill_loss(
+                        replay_reps, past_replay_reps)
+                    distill_loss_mem.backward()
+                    distill_mem_shared_grad = []
+                    for name, param in self.classifier.named_parameters():
+                        if param.grad is None:
+                            continue
+                        else:
+                            distill_mem_shared_grad.append(param.grad.detach().data.clone().flatten())
+                        param.grad.zero_()
+                    distill_mem_shared_grad = torch.cat(distill_mem_shared_grad, dim=0)
 
 
 
                     # shared_grad = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))["updating_grad"]
-                    # mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
-                    mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad]))
+                    mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, distill_mem_shared_grad, loss_mem_shared_grad]))
+                    # mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad]))
 
                     shared_grad = mtl_output["updating_grad"]
                     print("Alpha: ", mtl_output["alpha"])
+                    print("Norm_grad", mtl_output["norm_grads"])
 
                     
                     total_length = 0
@@ -365,12 +368,14 @@ def AUGD(grads_list):
     scale_norm_grads = {}
     grads = {}
     norm_grads = {}
+    norms = {}
     for i, grad in enumerate(grads_list):
 
         norm_term = torch.norm(grad)
 
         grads[i] = grad
         norm_grads[i] = grad / norm_term
+        norms[i] = norm_term
     for i, g in enumerate(grads_list):
         if i > 0:
             scale_norm_grads1[i] = norm_grads[0]*torch.norm(grads[i])
@@ -403,5 +408,6 @@ def AUGD(grads_list):
     new_grad = new_grad*(torch.norm(grads[0])/torch.dot(new_grad,norm_grads[0]))
     return dict(
         updating_grad = new_grad,
-        alpha = alpha
+        alpha = alpha,
+        norm_grads = norms
     )
