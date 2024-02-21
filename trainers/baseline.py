@@ -28,11 +28,13 @@ class Trainer:
         self.key_mixture = {}
         self.buffer_embedding = {}
         self.past_memory = None
+        self.past_label_set = None
 
     def new_task(self, train_dataset, test_dataset, num_labels):
         self.task_num += 1
         self.past_memory = self.buffer_embedding
         self.curr_label_set = set(train_dataset.labels)
+        self.past_label_set = set(self.buffer_embedding.keys())
         for i in self.curr_label_set:
             self.buffer_distribution[i] = [] 
             self.key_mixture[i] = None
@@ -42,9 +44,6 @@ class Trainer:
         self.temp_classifier.new_task(num_labels)
         # train classifier with new dataset
         self.training(train_dataset)
-        #train classifier with GMM data set
-        #distillation
-        # self.training(train_dataset, test_dataset)
         # evaluating
         # self.evaluating(test_dataset)
 
@@ -59,13 +58,10 @@ class Trainer:
         num_warmup_steps = num_training_steps * self.args.warmup_ratio
         scheduler = get_linear_schedule_with_warmup(
             optimizer, num_warmup_steps, num_training_steps)
-        # self.model.cuda()
         self.encoder.cuda()
         self.classifier.cuda()
         self.temp_classifier.cuda()
 
-        # X_embedding = {}
-        new_data = copy.deepcopy(dataset)
         cur_embeding = []
         cur_label = []
         for idx, batch in enumerate(tqdm(loader, desc=f"Forward current data")):
@@ -93,14 +89,12 @@ class Trainer:
             # self.key_mixture[label] = GaussianMixture(n_components=1, random_state=42).fit(self.buffer_distribution[label].cpu().detach().numpy())
             self.key_mixture[label] = GaussianMixture(n_components=1, random_state=42).fit(self.buffer_distribution[label])
             # if self.args.gmm_num_components == 1:
-            self.key_mixture[label].weights_[0] = 1.0
+            # self.key_mixture[label].weights_[0] = 1.0
         #Sample prelogits 
         for i, label in enumerate(self.curr_label_set):
             replay_embedding =  self.key_mixture[label].sample(100 * 256)[0].astype("float32")
             self.buffer_embedding[label].append(torch.tensor(replay_embedding))
         
-        # if self.task_num > 1:
-        #     self.past_classifier = copy.deepcopy(self)
         if self.task_num ==1:
             self.classifier.train()
             for epoch in range(self.args.epochs_list[self.task_num - 1]):
@@ -112,11 +106,8 @@ class Trainer:
                     # _, _, labels = batch
                     labels = cur_label[idx]
                     labels = labels.cuda()
-                    # print(labels)
                     optimizer.zero_grad()
                     logits = self.classifier(cur_embeding[idx].cuda())
-                    # print(cur_embeding[idx].shape)
-                    # print(cur_embeding[idx])
                     loss_fct = nn.CrossEntropyLoss()
                     loss = loss_fct(
                         logits.view(-1, logits.shape[-1]), labels.view(-1))
@@ -124,9 +115,6 @@ class Trainer:
                     loss.backward()
                     optimizer.step()
                     scheduler.step()
-                    # _, _, labels = batch
-                    # print(labels)
-                    # labels = labels.cuda()
                     pred = torch.argmax(logits, dim=1)
                     correct += torch.sum(pred == labels).item()
                     total += len(labels)
@@ -135,9 +123,6 @@ class Trainer:
                 print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
         else:
             self.past_classifier = self.classifier.get_cur_classifer()
-            # optimizer_tmp = torch.optim.AdamW(self.temp_classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
-            # scheduler_tmp = get_linear_schedule_with_warmup(
-            #                         optimizer_tmp, num_warmup_steps, num_training_steps)
             self.classifier.train()
             for epoch in range(10):
                 
@@ -152,7 +137,6 @@ class Trainer:
                     # print(labels)
                     optimizer.zero_grad()
                     logits = self.classifier(cur_embeding[idx].cuda())
-                    # logits = self.temp_classifier(cur_embeding[idx].cuda())
                     # logits[:, :self.classifier.old_num_labels] = -1e4
                     loss_fct = nn.CrossEntropyLoss()
                     loss = loss_fct(
@@ -161,9 +145,6 @@ class Trainer:
                     loss.backward()
                     optimizer.step()
                     scheduler.step()
-                    # _, _, labels = batch
-                    # print(labels)
-                    # labels = labels.cuda()
                     pred = torch.argmax(logits, dim=1)
                     correct += torch.sum(pred == labels).item()
                     total += len(labels)
@@ -186,25 +167,24 @@ class Trainer:
                 total_distill_loss = 0
                 total_distill_loss_mem = 0
                 total_loss_mem = 0
-                # for param in self.classifier.parameters():
-                #      param.requires_grad = True
                 for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
                     #Distill current classifier vs finetuned classifier
-                    labels = cur_label[idx]
-                    labels = labels.cuda()
                     optimizer.zero_grad()
-                    cur_reps = self.classifier(cur_embeding[idx].cuda())
+                    cur_embed, cur_labels = sample_batch(self.buffer_embedding, 64, self.curr_label_set)
+                    cur_labels = torch.tensor(cur_labels).cuda()
+                    cur_embed = torch.stack(cur_embed)
+                    cur_reps = self.classifier(cur_embed.cuda())
                     # cur_reps[:,:self.classifier.old_num_labels] = -1e4
                     with torch.no_grad():
-                        past_reps = self.finetuned_classifier(cur_embeding[idx].cuda())
+                        past_reps = self.finetuned_classifier(cur_embed.cuda())
                     # past_reps[:,:self.classifier.old_num_labels] = -1e4
                     loss_fct = nn.CrossEntropyLoss()
                     loss = loss_fct(
-                        cur_reps.view(-1, cur_reps.shape[-1]), labels.view(-1))
+                        cur_reps.view(-1, cur_reps.shape[-1]), cur_labels.view(-1))
                     distill_loss = self.distill_loss(
                         cur_reps, past_reps) 
                     #Forwar Memory
-                    replay_embed, replay_labels = sample_batch(self.past_memory, 512)
+                    replay_embed, replay_labels = sample_batch(self.past_memory, 64, self.past_label_set)
                     replay_labels = torch.tensor(replay_labels).cuda()
                     replay_embed = torch.stack(replay_embed)
                     replay_reps = self.classifier(replay_embed.cuda())
@@ -280,7 +260,7 @@ class Trainer:
                     #         ].reshape(param.shape)
                     #         total_length += length
 
-                    training_loss = 5*loss + 2*distill_loss + 0.5*loss_mem + 0.5*distill_loss_mem
+                    training_loss = 5*loss + 2*distill_loss + 15*loss_mem + 15*distill_loss_mem
                     # training_loss = 0.2*loss + 0.3*distill_loss + 0.5*distill_loss_mem
                     # training_loss = 0.2*loss + 0.3*distill_loss + 0.5*loss_mem
                     training_loss.backward()
@@ -361,9 +341,9 @@ class Trainer:
         return -1 * torch.mul(soft, pred).sum() / pred.shape[0]
     import random
 
-def sample_batch(memory, batch_size):
+def sample_batch(memory, batch_size, labels):
 
-  labels = list(memory.keys())
+#   labels = list(memory.keys())
 
 #   num_inputs_ids = len(memory[labels[0]])
   inputs_batch = []
