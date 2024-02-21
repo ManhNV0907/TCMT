@@ -170,7 +170,7 @@ class Trainer:
                     cur_labels = torch.tensor(cur_labels).cuda()
                     cur_embed = torch.stack(cur_embed)
                     cur_reps = self.classifier(cur_embed.cuda())
-                    # cur_reps[:,:self.classifier.old_num_labels] = -1e4
+                    cur_reps[:,:self.classifier.old_num_labels] = -1e4
                     loss_fct = nn.CrossEntropyLoss()
                     loss = loss_fct(
                         cur_reps.view(-1, cur_reps.shape[-1]), cur_labels.view(-1))
@@ -186,9 +186,10 @@ class Trainer:
                     loss_shared_grad = torch.cat(loss_shared_grad, dim=0)
 
                     cur_reps = self.classifier(cur_embed.cuda())
+                    cur_reps[:,:self.classifier.old_num_labels] = -1e4
                     with torch.no_grad():
                         past_reps = self.finetuned_classifier(cur_embed.cuda())
-                    # past_reps[:,:self.classifier.old_num_labels] = -1e4
+                    past_reps[:,:self.classifier.old_num_labels] = -1e4
                     distill_loss = self.distill_loss(
                         cur_reps, past_reps) 
                     distill_loss.backward()
@@ -206,7 +207,7 @@ class Trainer:
                     replay_labels = torch.tensor(replay_labels).cuda()
                     replay_embed = torch.stack(replay_embed)
                     replay_reps = self.classifier(replay_embed.cuda())
-                    # replay_reps[:,self.classifier.old_num_labels:] = -1e4
+                    replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     loss_mem = loss_fct(
                         replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
                     loss_mem.backward()
@@ -220,9 +221,10 @@ class Trainer:
                     loss_mem_shared_grad = torch.cat(loss_mem_shared_grad, dim=0)
 
                     replay_reps = self.classifier(replay_embed.cuda())
+                    replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     with torch.no_grad():
                         past_replay_reps = self.past_classifier(replay_embed.cuda())
-                    # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
+                    past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     distill_loss_mem = self.distill_loss(
                         replay_reps, past_replay_reps)
                     distill_loss_mem.backward()
