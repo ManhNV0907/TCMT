@@ -133,27 +133,27 @@ class Classifier(nn.Module):
         self.config = AutoConfig.from_pretrained(args.model_name_or_path)
         self.config.hidden_size = 96
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.top_linear = nn.Linear(self.config.hidden_size,20)
+        self.top_linear = nn.Linear(self.config.hidden_size,0)
         
         self.num_labels = 0
         self.num_tasks = 0
         # self.old_model = None
         # self.cur_model = None
-        self.head = nn.Sequential(
-            nn.Linear(768, 384, bias=True),
-            nn.ReLU(inplace=True),
-            nn.Linear(384, 192, bias=True),
-            nn.ReLU(inplace=True),
-            nn.Linear(192, 96, bias=True),
-            nn.ReLU(inplace=True),
-        )
+        # self.head = nn.Sequential(
+        #     nn.Linear(768, 384, bias=True),
+        #     nn.ReLU(inplace=True),
+        #     nn.Linear(384, 192, bias=True),
+        #     nn.ReLU(inplace=True),
+        #     nn.Linear(192, 96, bias=True),
+        #     nn.ReLU(inplace=True),
+        # )
     def get_cur_classifer(self):
         self.cur_model = None
         self.cur_model = deepcopy(self)
         return self.cur_model
 
     def forward(self, x: torch.Tensor):
-        x = self.head(x)
+        # x = self.head(x)
         out = self.top_linear(x)
         return out    
 
@@ -169,9 +169,9 @@ class Classifier(nn.Module):
             # expand classifier
             num_old_labels = self.num_labels
             self.num_labels += num_labels
-            # w = self.top_linear.weight.data.clone()
-            # b = self.top_linear.bias.data.clone()
-            # self.top_linear = nn.Linear(
-            #     self.config.hidden_size, self.num_labels, device=self.device)
-            # self.top_linear.weight.data[:num_old_labels] = w
-            # self.top_linear.bias.data[:num_old_labels] = b
+            w = self.top_linear.weight.data.clone()
+            b = self.top_linear.bias.data.clone()
+            self.top_linear = nn.Linear(
+                self.config.hidden_size, self.num_labels, device=self.device)
+            self.top_linear.weight.data[:num_old_labels] = w
+            self.top_linear.bias.data[:num_old_labels] = b
