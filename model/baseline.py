@@ -131,7 +131,7 @@ class Classifier(nn.Module):
         super().__init__()
         self.args = args
         self.config = AutoConfig.from_pretrained(args.model_name_or_path)
-        # self.config.hidden_size = 96
+        self.config.hidden_size = 96
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.top_linear = nn.Linear(self.config.hidden_size,0)
         
@@ -153,7 +153,7 @@ class Classifier(nn.Module):
         return self.cur_model
 
     def forward(self, x: torch.Tensor):
-        # x = self.head(x)
+        x = self.head(x)
         out = self.top_linear(x)
         return out    
 
