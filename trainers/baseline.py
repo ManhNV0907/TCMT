@@ -123,7 +123,7 @@ class Trainer:
             self.past_classifier.cuda()
             self.classifier.train()
             for epoch in range(20):
-                
+                #Finetune classifier on current data
                 correct, total = 0, 0
                 total_loss = 0
                 for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
@@ -147,9 +147,42 @@ class Trainer:
                     total += len(labels)
 
                 print(f"Epoch {epoch} Training Accuracy: {correct/total}")
-                print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
+                # print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
+
             self.finetuned_classifier = self.classifier.get_cur_classifer()
             self.finetuned_classifier.cuda()
+            self.classifier = self.past_classifier
+            optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
+            scheduler = get_linear_schedule_with_warmup(
+                                    optimizer, num_warmup_steps, num_training_steps)
+            self.classifier.train()
+            # self.finetuned_classifier.eval()
+            # self.past_classifier.eval()
+            for epoch in range(self.args.epochs_list[self.task_num - 1]):
+                #Finetune classifier on replay data
+                correct, total = 0, 0
+                total_loss = 0
+                total_loss_mem = 0
+                for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
+                    #Distill current classifier vs finetuned classifier
+                    optimizer.zero_grad()
+                    #Forwar Memory
+                    replay_embed, replay_labels = sample_batch(self.past_memory, 1024, self.past_label_set)
+                    replay_labels = torch.tensor(replay_labels).cuda()
+                    replay_embed = torch.stack(replay_embed)
+                    replay_reps = self.classifier(replay_embed.cuda())
+                    # replay_reps[:,self.classifier.old_num_labels:] = -1e4
+                    loss_mem = loss_fct(
+                        replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
+                    loss_mem.backward()
+                    optimizer.step()
+                    scheduler.step()
+                    pred = torch.argmax(replay_reps, dim=1)
+                    correct += torch.sum(pred == replay_labels).item()
+                    total += len(replay_labels)
+
+            self.finetuned_classifier_mem = self.classifier.get_cur_classifer()
+            self.finetuned_classifier_mem.cuda()
 
             self.classifier = self.past_classifier
             optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
@@ -158,6 +191,7 @@ class Trainer:
             self.classifier.train()
             self.finetuned_classifier.eval()
             self.past_classifier.eval()
+            self.finetuned_classifier_mem.eval()
             for epoch in range(self.args.epochs_list[self.task_num - 1]):
 
                 correct, total = 0, 0
@@ -224,8 +258,10 @@ class Trainer:
 
                     # replay_reps = self.classifier(replay_embed.cuda())
                     # replay_reps[:,self.classifier.old_num_labels:] = -1e4
+                    
                     with torch.no_grad():
-                        past_replay_reps = self.past_classifier(replay_embed.cuda())
+                        # past_replay_reps = self.past_classifier(replay_embed.cuda())
+                        past_replay_reps = self.finetuned_classifier_mem(replay_embed.cuda())
                     # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     distill_loss_mem = self.distill_loss(
                         replay_reps, past_replay_reps)
@@ -243,8 +279,8 @@ class Trainer:
 
 
                     # shared_grad = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))["updating_grad"]
-                    # mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
-                    mtl_output = AUGD(torch.stack([loss_shared_grad,distill_mem_shared_grad]))
+                    mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
+                    # mtl_output = AUGD(torch.stack([loss_shared_grad,distill_mem_shared_grad]))
 
 
                     # if torch.norm(distill_mem_shared_grad) > 0.1:
