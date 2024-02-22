@@ -116,13 +116,13 @@ class Trainer:
                     correct += torch.sum(pred == labels).item()
                     total += len(labels)
 
-                print(f"Epoch {epoch} Training Accuracy: {correct/total}")
-                print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
+                # print(f"Epoch {epoch} Training Accuracy: {correct/total}")
+                # print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
         else:
             self.past_classifier = self.classifier.get_cur_classifer()
             self.past_classifier.cuda()
             self.classifier.train()
-            for epoch in range(1):
+            for epoch in range(20):
                 #Finetune classifier on current data
                 correct, total = 0, 0
                 total_loss = 0
@@ -146,7 +146,7 @@ class Trainer:
                     correct += torch.sum(pred == labels).item()
                     total += len(labels)
 
-                print(f"Epoch {epoch} Training Accuracy: {correct/total}")
+                # print(f"Epoch {epoch} Training Accuracy: {correct/total}")
                 # print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
 
             self.finetuned_classifier = self.classifier.get_cur_classifer()
@@ -158,7 +158,7 @@ class Trainer:
             self.classifier.train()
             # self.finetuned_classifier.eval()
             # self.past_classifier.eval()
-            for epoch in range(1):
+            for epoch in range(20):
                 #Finetune classifier on replay data
                 correct, total = 0, 0
                 total_loss = 0
@@ -280,7 +280,9 @@ class Trainer:
 
                     # shared_grad = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))["updating_grad"]
                     # mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
-                    mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
+                    mtl_output = AUGD(torch.stack([distill_shared_grad, distill_mem_shared_grad]))
+
+                    # mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
 
                     # mtl_output = AUGD(torch.stack([loss_shared_grad,distill_mem_shared_grad]))
 
