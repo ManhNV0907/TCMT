@@ -235,82 +235,84 @@ class Trainer:
                     # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     distill_loss_mem = self.distill_loss(
                         replay_reps, past_replay_reps)
-                    # # Backward and optimize
-                    # loss.backward(retain_graph=True)
-                    # loss_shared_grad = []
-                    # for name, param in self.classifier.named_parameters():
-                    #     if param.grad is None:
-                    #         continue
-                    #     else:
-                    #         loss_shared_grad.append(param.grad.detach().data.clone().flatten())
-                    #     param.grad.zero_()
-                    # loss_shared_grad = torch.cat(loss_shared_grad, dim=0)
+                    # Backward and optimize
+                    loss.backward(retain_graph=True)
+                    loss_shared_grad = []
+                    for name, param in self.classifier.named_parameters():
+                        if param.grad is None:
+                            continue
+                        else:
+                            loss_shared_grad.append(param.grad.detach().data.clone().flatten())
+                        param.grad.zero_()
+                    loss_shared_grad = torch.cat(loss_shared_grad, dim=0)
 
-                    # distill_loss.backward()
-                    # distill_shared_grad = []
-                    # for name, param in self.classifier.named_parameters():
-                    #     if param.grad is None:
-                    #         continue
-                    #     else:
-                    #         distill_shared_grad.append(param.grad.detach().data.clone().flatten())
-                    #     param.grad.zero_()
-                    # distill_shared_grad = torch.cat(distill_shared_grad, dim=0)
+                    distill_loss.backward()
+                    distill_shared_grad = []
+                    for name, param in self.classifier.named_parameters():
+                        if param.grad is None:
+                            continue
+                        else:
+                            distill_shared_grad.append(param.grad.detach().data.clone().flatten())
+                        param.grad.zero_()
+                    distill_shared_grad = torch.cat(distill_shared_grad, dim=0)
 
-                    # loss_mem.backward(retain_graph=True)
+                    loss_mem.backward(retain_graph=True)
 
-                    # loss_mem_shared_grad = []
-                    # for name, param in self.classifier.named_parameters():
-                    #     if param.grad is None:
-                    #         continue
-                    #     else:
-                    #         loss_mem_shared_grad.append(param.grad.detach().data.clone().flatten())
-                    #     param.grad.zero_()
-                    # loss_mem_shared_grad = torch.cat(loss_mem_shared_grad, dim=0)
-                    # distill_loss_mem.backward()
-                    # distill_mem_shared_grad = []
-                    # for name, param in self.classifier.named_parameters():
-                    #     if param.grad is None:
-                    #         continue
-                    #     else:
-                    #         param.grad = param.grad
-                    #         distill_mem_shared_grad.append(param.grad.detach().data.clone().flatten())
-                    #     param.grad.zero_()
-                    # distill_mem_shared_grad = torch.cat(distill_mem_shared_grad, dim=0)
+                    loss_mem_shared_grad = []
+                    for name, param in self.classifier.named_parameters():
+                        if param.grad is None:
+                            continue
+                        else:
+                            loss_mem_shared_grad.append(param.grad.detach().data.clone().flatten())
+                        param.grad.zero_()
+                    loss_mem_shared_grad = torch.cat(loss_mem_shared_grad, dim=0)
+                    distill_loss_mem.backward()
+                    distill_mem_shared_grad = []
+                    for name, param in self.classifier.named_parameters():
+                        if param.grad is None:
+                            continue
+                        else:
+                            param.grad = param.grad
+                            distill_mem_shared_grad.append(param.grad.detach().data.clone().flatten())
+                        param.grad.zero_()
+                    distill_mem_shared_grad = torch.cat(distill_mem_shared_grad, dim=0)
 
 
 
-                    # # shared_grad = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))["updating_grad"]
-                    # # mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
+                    # shared_grad = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))["updating_grad"]
+                    # mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
                     # mtl_output = AUGD(torch.stack([distill_shared_grad, distill_mem_shared_grad]))
-
-                    # # mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
-
-                    # # mtl_output = AUGD(torch.stack([loss_shared_grad,distill_mem_shared_grad]))
+                    mtl_output = PCGrad(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
 
 
-                    # # if torch.norm(distill_mem_shared_grad) > 0.1:
-                    # #     mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
-                    # # else:
-                    # #     mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad]))
+                    # mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
 
-                    # shared_grad = mtl_output["updating_grad"]
-                    # # print("Alpha: ", mtl_output["alpha"])
-                    # # print("Norm_grad", mtl_output["norm_grads"])
+                    # mtl_output = AUGD(torch.stack([loss_shared_grad,distill_mem_shared_grad]))
+
+
+                    # if torch.norm(distill_mem_shared_grad) > 0.1:
+                    #     mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
+                    # else:
+                    #     mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad]))
+
+                    shared_grad = mtl_output["updating_grad"]
+                    # print("Alpha: ", mtl_output["alpha"])
+                    # print("Norm_grad", mtl_output["norm_grads"])
 
                     
-                    # total_length = 0
-                    # for name, param in self.classifier.named_parameters():
-                    #     if 'cur' not in name:
-                    #         length = param.numel()
-                    #         param.grad.data = shared_grad[
-                    #             total_length : total_length + length
-                    #         ].reshape(param.shape)
-                    #         total_length += length
+                    total_length = 0
+                    for name, param in self.classifier.named_parameters():
+                        if 'cur' not in name:
+                            length = param.numel()
+                            param.grad.data = shared_grad[
+                                total_length : total_length + length
+                            ].reshape(param.shape)
+                            total_length += length
 
-                    training_loss = 5*loss + 5*distill_loss + loss_mem + distill_loss_mem
+                    # training_loss = 5*loss + 5*distill_loss + loss_mem + distill_loss_mem
                     # training_loss = 0.2*loss + 0.3*distill_loss + 0.5*distill_loss_mem
                     # training_loss = 0.2*loss + 0.3*distill_loss + 0.5*loss_mem
-                    training_loss.backward()
+                    # training_loss.backward()
                     optimizer.step()
                     scheduler.step()
                     pred = torch.argmax(cur_reps, dim=1)
@@ -463,3 +465,27 @@ def AUGD(grads_list):
         alpha = alpha,
         norm_grads = norms
     )
+
+def PCGrad(grads: List[Tuple[torch.Tensor]], reduction: str = "sum") -> torch.Tensor:
+    pc_grad = copy.deepcopy(grads)
+    for g_i in pc_grad:
+        random.shuffle(grads)
+        for g_j in grads:
+            g_i_g_j = sum(
+                [
+                    torch.dot(torch.flatten(grad_i), torch.flatten(grad_j))
+                    for grad_i, grad_j in zip(g_i, g_j)
+                ]
+            )
+            if g_i_g_j < 0:
+                g_j_norm_square = (
+                    torch.norm(torch.cat([torch.flatten(g) for g in g_j])) ** 2
+                )
+                for grad_i, grad_j in zip(g_i, g_j):
+                    grad_i -= g_i_g_j * grad_j / g_j_norm_square
+
+    merged_grad = [sum(g) for g in zip(*pc_grad)]
+    if reduction == "mean":
+        merged_grad = [g / len(grads) for g in merged_grad]
+
+    return dict(updating_grad = merged_grad)
