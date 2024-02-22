@@ -203,7 +203,7 @@ class Trainer:
                     #Distill current classifier vs finetuned classifier
                     optimizer.zero_grad()
                     c_label_set = set(self.buffer_embedding.keys())
-                    cur_embed, cur_labels = sample_batch(self.buffer_embedding, c_label_set)
+                    cur_embed, cur_labels = sample_batch(self.buffer_embedding, 32, c_label_set)
                     cur_labels = torch.tensor(cur_labels).cuda()
                     cur_embed = torch.stack(cur_embed)
                     cur_reps = self.classifier(cur_embed.cuda())
