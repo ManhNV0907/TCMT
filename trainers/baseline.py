@@ -158,7 +158,7 @@ class Trainer:
             self.classifier.train()
             # self.finetuned_classifier.eval()
             # self.past_classifier.eval()
-            for epoch in range(self.args.epochs_list[self.task_num - 1]):
+            for epoch in range(20):
                 #Finetune classifier on replay data
                 correct, total = 0, 0
                 total_loss = 0
@@ -167,7 +167,7 @@ class Trainer:
                     #Distill current classifier vs finetuned classifier
                     optimizer.zero_grad()
                     #Forwar Memory
-                    replay_embed, replay_labels = sample_batch(self.past_memory, 1024, self.past_label_set)
+                    replay_embed, replay_labels = sample_batch(self.past_memory, 32, self.past_label_set)
                     replay_labels = torch.tensor(replay_labels).cuda()
                     replay_embed = torch.stack(replay_embed)
                     replay_reps = self.classifier(replay_embed.cuda())
@@ -239,7 +239,7 @@ class Trainer:
                     distill_shared_grad = torch.cat(distill_shared_grad, dim=0)
 
                     #Forwar Memory
-                    replay_embed, replay_labels = sample_batch(self.past_memory, 1024, self.past_label_set)
+                    replay_embed, replay_labels = sample_batch(self.past_memory, 32, self.past_label_set)
                     replay_labels = torch.tensor(replay_labels).cuda()
                     replay_embed = torch.stack(replay_embed)
                     replay_reps = self.classifier(replay_embed.cuda())
@@ -289,8 +289,8 @@ class Trainer:
                     #     mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad]))
 
                     shared_grad = mtl_output["updating_grad"]
-                    print("Alpha: ", mtl_output["alpha"])
-                    print("Norm_grad", mtl_output["norm_grads"])
+                    # print("Alpha: ", mtl_output["alpha"])
+                    # print("Norm_grad", mtl_output["norm_grads"])
 
                     
                     total_length = 0
