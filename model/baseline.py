@@ -131,7 +131,7 @@ class Classifier(nn.Module):
         super().__init__()
         self.args = args
         self.config = AutoConfig.from_pretrained(args.model_name_or_path)
-        self.config.hidden_size = 96
+        # self.config.hidden_size = 96
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.top_linear = nn.Linear(self.config.hidden_size,0)
         
