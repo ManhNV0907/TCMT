@@ -131,7 +131,7 @@ class Classifier(nn.Module):
         super().__init__()
         self.args = args
         self.config = AutoConfig.from_pretrained(args.model_name_or_path)
-        self.config.hidden_size = 96
+        # self.config.hidden_size = 96
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.top_linear = nn.Linear(self.config.hidden_size,0)
         
@@ -142,16 +142,16 @@ class Classifier(nn.Module):
         self.head = nn.Sequential(
             nn.Linear(768, 768, bias=True),
             nn.ReLU(inplace=True),
-            nn.Linear(768, 384, bias=True),
-            nn.ReLU(inplace=True),
-            nn.Linear(384, 384, bias=True),
-            nn.ReLU(inplace=True),
-            nn.Linear(384, 192, bias=True),
-            nn.ReLU(inplace=True),
-            nn.Linear(192, 192, bias=True),
-            nn.ReLU(inplace=True),
-            nn.Linear(192, 96, bias=True),
-            nn.ReLU(inplace=True),
+            # nn.Linear(768, 384, bias=True),
+            # nn.ReLU(inplace=True),
+            # nn.Linear(384, 384, bias=True),
+            # nn.ReLU(inplace=True),
+            # nn.Linear(384, 192, bias=True),
+            # nn.ReLU(inplace=True),
+            # nn.Linear(192, 192, bias=True),
+            # nn.ReLU(inplace=True),
+            # nn.Linear(192, 96, bias=True),
+            # nn.ReLU(inplace=True),
         )
     def get_cur_classifer(self):
         self.cur_model = None
