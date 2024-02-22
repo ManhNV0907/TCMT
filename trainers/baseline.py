@@ -235,7 +235,7 @@ class Trainer:
                         if param.grad is None:
                             continue
                         else:
-                            param.grad = param.grad*1e9
+                            param.grad = param.grad
                             distill_mem_shared_grad.append(param.grad.detach().data.clone().flatten())
                         param.grad.zero_()
                     distill_mem_shared_grad = torch.cat(distill_mem_shared_grad, dim=0)
@@ -243,7 +243,9 @@ class Trainer:
 
 
                     # shared_grad = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))["updating_grad"]
-                    mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
+                    # mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
+                    mtl_output = AUGD(torch.stack([loss_shared_grad,distill_mem_shared_grad]))
+
 
                     # if torch.norm(distill_mem_shared_grad) > 0.1:
                     #     mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
