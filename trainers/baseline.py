@@ -235,7 +235,7 @@ class Trainer:
                         if param.grad is None:
                             continue
                         else:
-                            param.grad = param.grad*1e6
+                            param.grad = param.grad*1e7
                             distill_mem_shared_grad.append(param.grad.detach().data.clone().flatten())
                         param.grad.zero_()
                     distill_mem_shared_grad = torch.cat(distill_mem_shared_grad, dim=0)
