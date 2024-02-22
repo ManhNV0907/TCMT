@@ -139,14 +139,14 @@ class Classifier(nn.Module):
         self.num_tasks = 0
         # self.old_model = None
         # self.cur_model = None
-        # self.head = nn.Sequential(
-        #     nn.Linear(768, 384, bias=True),
-        #     nn.ReLU(inplace=True),
-        #     nn.Linear(384, 192, bias=True),
-        #     nn.ReLU(inplace=True),
-        #     nn.Linear(192, 96, bias=True),
-        #     nn.ReLU(inplace=True),
-        # )
+        self.head = nn.Sequential(
+            nn.Linear(768, 384, bias=True),
+            nn.ReLU(inplace=True),
+            nn.Linear(384, 192, bias=True),
+            nn.ReLU(inplace=True),
+            nn.Linear(192, 96, bias=True),
+            nn.ReLU(inplace=True),
+        )
     def get_cur_classifer(self):
         self.cur_model = None
         self.cur_model = deepcopy(self)
