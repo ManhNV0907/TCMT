@@ -122,7 +122,7 @@ class Trainer:
             self.past_classifier = self.classifier.get_cur_classifer()
             self.past_classifier.cuda()
             self.classifier.train()
-            for epoch in range(20):
+            for epoch in range(1):
                 #Finetune classifier on current data
                 correct, total = 0, 0
                 total_loss = 0
@@ -158,7 +158,7 @@ class Trainer:
             self.classifier.train()
             # self.finetuned_classifier.eval()
             # self.past_classifier.eval()
-            for epoch in range(20):
+            for epoch in range(1):
                 #Finetune classifier on replay data
                 correct, total = 0, 0
                 total_loss = 0
@@ -279,7 +279,9 @@ class Trainer:
 
 
                     # shared_grad = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))["updating_grad"]
-                    mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
+                    # mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
+                    mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
+
                     # mtl_output = AUGD(torch.stack([loss_shared_grad,distill_mem_shared_grad]))
 
 
