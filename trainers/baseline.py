@@ -149,7 +149,8 @@ class Trainer:
 
             self.finetuned_classifier = self.classifier.get_cur_classifer()
             self.finetuned_classifier.cuda()
-            self.classifier = self.past_classifier
+            self.classifier = self.past_classifier.get_cur_classifer()
+            self.classifier.cuda()
             optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
             scheduler = get_linear_schedule_with_warmup(
                                     optimizer, num_warmup_steps, num_training_steps)
@@ -180,7 +181,7 @@ class Trainer:
                     with torch.no_grad():
                         past_reps = self.finetuned_classifier(cur_embed.cuda())
                     distill_loss = self.distill_loss(
-                        cur_reps[:,self.classifier.old_num_labels:], past_reps[:,self.classifier.old_num_labels:]) 
+                        cur_reps, past_reps) 
                     #Forwar Memory
                     replay_embed, replay_labels = next(iter(replay_loader))
                     # replay_embed, replay_labels = replay_batch
