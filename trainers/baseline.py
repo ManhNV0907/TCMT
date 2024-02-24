@@ -88,7 +88,7 @@ class Trainer:
             # self.key_mixture[label].weights_[0] = 1.0
         #Sample prelogits for each label
         for i, label in enumerate(self.curr_label_set):
-            replay_embedding =  self.key_mixture[label].sample(512000)[0].astype("float32")
+            replay_embedding =  self.key_mixture[label].sample(5120)[0].astype("float32")
             self.buffer_embedding[label].append(torch.tensor(replay_embedding))
         
         if self.task_num ==1:
@@ -166,7 +166,8 @@ class Trainer:
                 total_distill_loss = 0
                 total_distill_loss_mem = 0
                 total_loss_mem = 0
-                for idx, (batch, replay_batch) in enumerate(tqdm(zip(cur_loader,replay_loader), desc=f"Training Epoch {epoch}")):
+                # for idx, (batch, replay_batch) in enumerate(tqdm(zip(cur_loader,replay_loader), desc=f"Training Epoch {epoch}")):
+                for idx, batch in enumerate(tqdm(cur_loader, desc=f"Training Epoch {epoch}")):
                     cur_embed, cur_labels = batch
                     #Distill current classifier vs finetuned classifier
                     optimizer.zero_grad()
@@ -181,7 +182,8 @@ class Trainer:
                     distill_loss = self.distill_loss(
                         cur_reps[:,self.classifier.old_num_labels:], past_reps[:,self.classifier.old_num_labels:]) 
                     #Forwar Memory
-                    replay_embed, replay_labels = replay_batch
+                    replay_embed, replay_labels = next(iter(replay_loader))
+                    # replay_embed, replay_labels = replay_batch
                     replay_labels = torch.tensor(replay_labels).cuda()
                     replay_reps = self.classifier(replay_embed.cuda())
                     # replay_reps[:,self.classifier.old_num_labels:] = -1e4
@@ -238,10 +240,11 @@ class Trainer:
 
 
 
-                    mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
+                    # mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
                     # mtl_output = AUGD(torch.stack([distill_shared_grad, distill_mem_shared_grad]))
                     # mtl_output = CAGrad(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
 
+                    mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad, distill_shared_grad]))
                     # mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
                     # mtl_output = CAGrad(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
                     shared_grad = mtl_output["updating_grad"]
