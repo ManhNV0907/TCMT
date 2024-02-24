@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader, ConcatDataset, Subset
 from transformers import get_linear_schedule_with_warmup
 from model.baseline import Encoder, Classifier
 from utils.read_data import statistic
+from utils.replay_dataloader import MemoryLoader
 import torch.nn.functional as F
 from sklearn.mixture import GaussianMixture
 import random
@@ -84,9 +85,7 @@ class Trainer:
                 self.buffer_distribution[labels[i].item()].append(outputs[i].cpu())
         
         for label in self.curr_label_set:
-            # self.buffer_distribution[label] =  torch.cat(self.buffer_distribution[label], dim=0).reshape(-1, 1)
-            # self.key_mixture[label] = GaussianMixture(n_components=1, random_state=42).fit(self.buffer_distribution[label].cpu().detach().numpy())
-            self.key_mixture[label] = GaussianMixture(n_components=1, random_state=42).fit(self.buffer_distribution[label])
+            self.key_mixture[label] = GaussianMixture(n_components=2, random_state=42).fit(self.buffer_distribution[label])
             # if self.args.gmm_num_components == 1:
             # self.key_mixture[label].weights_[0] = 1.0
         #Sample prelogits 
@@ -148,7 +147,7 @@ class Trainer:
                     correct += torch.sum(pred == labels).item()
                     total += len(labels)
 
-                # print(f"Epoch {epoch} Training Accuracy: {correct/total}")
+                print(f"Epoch {epoch} Training Accuracy: {correct/total}")
                 # print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
 
             self.finetuned_classifier = self.classifier.get_cur_classifer()
@@ -160,16 +159,19 @@ class Trainer:
             self.classifier.train()
             # self.finetuned_classifier.eval()
             # self.past_classifier.eval()
+            replay_loader = MemoryLoader(self.past_memory, 32, self.past_label_set)
             for epoch in range(20):
                 #Finetune classifier on replay data
                 correct, total = 0, 0
                 total_loss = 0
                 total_loss_mem = 0
-                for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
+                # for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
+                for idx, batch in enumerate(tqdm(replay_loader, desc=f"Training Epoch {epoch}")):
+                    cur_embed, cur_labels = batch
                     #Distill current classifier vs finetuned classifier
                     optimizer.zero_grad()
                     #Forwar Memory
-                    replay_embed, replay_labels = sample_batch(self.past_memory, 64, self.past_label_set)
+                    # replay_embed, replay_labels = sample_batch(self.past_memory, 32, self.past_label_set)
                     replay_labels = torch.tensor(replay_labels).cuda()
                     replay_embed = torch.stack(replay_embed)
                     replay_reps = self.classifier(replay_embed.cuda())
@@ -194,6 +196,7 @@ class Trainer:
             self.finetuned_classifier.eval()
             self.past_classifier.eval()
             self.finetuned_classifier_mem.eval()
+            replay_loader = MemoryLoader(self.buffer_embedding, 64, self.curr_label_set)
             for epoch in range(self.args.epochs_list[self.task_num - 1]):
 
                 correct, total = 0, 0
@@ -201,10 +204,13 @@ class Trainer:
                 total_distill_loss = 0
                 total_distill_loss_mem = 0
                 total_loss_mem = 0
-                for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
+                
+                # for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
+                for idx, batch in enumerate(tqdm(replay_loader, desc=f"Training Epoch {epoch}")):
+                    cur_embed, cur_labels = batch
                     #Distill current classifier vs finetuned classifier
                     optimizer.zero_grad()
-                    cur_embed, cur_labels = sample_batch(self.buffer_embedding, 64, self.curr_label_set)
+                    # cur_embed, cur_labels = sample_batch(self.buffer_embedding, 64, self.curr_label_set)
                     cur_labels = torch.tensor(cur_labels).cuda()
                     cur_embed = torch.stack(cur_embed)
                     cur_reps = self.classifier(cur_embed.cuda())
@@ -380,7 +386,7 @@ class Trainer:
         return eval_acc
     
 
-    def distill_loss(self, pred, soft, T=1):
+    def distill_loss(self, pred, soft, T=2):
         """
         args:
             pred: logits of student model, [n, old_num_labels]
@@ -392,14 +398,11 @@ class Trainer:
         pred = torch.log_softmax(pred / T, dim=1)
         soft = torch.softmax(soft / T, dim=1)
         return -1 * torch.mul(soft, pred).sum() / pred.shape[0]
-    import random
+import random
 
 def sample_batch(memory, batch_size, labels):
 
-#   labels = list(memory.keys())
   labels = list(labels)
-
-#   num_inputs_ids = len(memory[labels[0]])
   inputs_batch = []
   labels_batch = []
 
@@ -407,8 +410,6 @@ def sample_batch(memory, batch_size, labels):
     label = random.choice(labels)
 
     input_ids = random.choice(memory[label][0])
-    # print(label)
-    # print(memory[label][0])
 
     inputs_batch.append(input_ids)
     labels_batch.append(label)
@@ -429,10 +430,6 @@ def AUGD(grads_list):
         grads[i] = grad
         norm_grads[i] = grad / norm_term
         norms[i] = norm_term
-    # if norms[3] < 0.01:
-    #     grads[3] = grads[3]*0.01/norms[3]
-        # grads_list = grads_list[:3]
-
     for i, g in enumerate(grads_list):
         if i > 0:
             scale_norm_grads1[i] = norm_grads[0]*torch.norm(grads[i])
