@@ -83,12 +83,12 @@ class Trainer:
                 self.buffer_distribution[labels[i].item()].append(outputs[i].cpu())
         
         for label in self.curr_label_set:
-            self.key_mixture[label] = GaussianMixture(n_components=1, random_state=42).fit(self.buffer_distribution[label])
+            self.key_mixture[label] = GaussianMixture(n_components=2, random_state=42).fit(self.buffer_distribution[label])
             # if self.args.gmm_num_components == 1:
             # self.key_mixture[label].weights_[0] = 1.0
         #Sample prelogits for each label
         for i, label in enumerate(self.curr_label_set):
-            replay_embedding =  self.key_mixture[label].sample(51200)[0].astype("float32")
+            replay_embedding =  self.key_mixture[label].sample(512000)[0].astype("float32")
             self.buffer_embedding[label].append(torch.tensor(replay_embedding))
         
         if self.task_num ==1:
@@ -179,7 +179,7 @@ class Trainer:
                     with torch.no_grad():
                         past_reps = self.finetuned_classifier(cur_embed.cuda())
                     distill_loss = self.distill_loss(
-                        cur_reps, past_reps) 
+                        cur_reps[:,self.classifier.old_num_labels:], past_reps[:,self.classifier.old_num_labels:]) 
                     #Forwar Memory
                     replay_embed, replay_labels = replay_batch
                     replay_labels = torch.tensor(replay_labels).cuda()
@@ -192,7 +192,7 @@ class Trainer:
                         past_replay_reps = self.past_classifier(replay_embed.cuda())
                     # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     distill_loss_mem = self.distill_loss(
-                        replay_reps, past_replay_reps)
+                        replay_reps[:,:self.classifier.old_num_labels], past_replay_reps[:,:self.classifier.old_num_labels])
                     
                     # Backward and optimize
                     loss.backward(retain_graph=True)
@@ -238,9 +238,9 @@ class Trainer:
 
 
 
-                    # mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
+                    mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
                     # mtl_output = AUGD(torch.stack([distill_shared_grad, distill_mem_shared_grad]))
-                    mtl_output = CAGrad(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
+                    # mtl_output = CAGrad(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
 
                     # mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
                     # mtl_output = CAGrad(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
