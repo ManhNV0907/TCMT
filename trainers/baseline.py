@@ -46,7 +46,7 @@ class Trainer:
         # train classifier with new dataset
         self.training(train_dataset)
         # evaluating
-        # self.evaluating(test_dataset)
+        self.evaluating(test_dataset)
 
     def training(self, dataset, test_dataset=None):
         
@@ -85,12 +85,12 @@ class Trainer:
                 self.buffer_distribution[labels[i].item()].append(outputs[i].cpu())
         
         for label in self.curr_label_set:
-            self.key_mixture[label] = GaussianMixture(n_components=1, random_state=42).fit(self.buffer_distribution[label])
+            self.key_mixture[label] = GaussianMixture(n_components=ư, random_state=42).fit(self.buffer_distribution[label])
             # if self.args.gmm_num_components == 1:
             # self.key_mixture[label].weights_[0] = 1.0
         #Sample prelogits 
         for i, label in enumerate(self.curr_label_set):
-            replay_embedding =  self.key_mixture[label].sample(20 * 5120)[0].astype("float32")
+            replay_embedding =  self.key_mixture[label].sample(5120)[0].astype("float32")
             self.buffer_embedding[label].append(torch.tensor(replay_embedding))
         
         if self.task_num ==1:
@@ -165,17 +165,11 @@ class Trainer:
                 correct, total = 0, 0
                 total_loss = 0
                 total_loss_mem = 0
-                # for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
                 for idx, batch in enumerate(tqdm(replay_loader, desc=f"Training Epoch {epoch}")):
-                    # print(batch[0])
-                    # print(len(batch))
-                    replay_embed, replay_labels = batch
                     #Distill current classifier vs finetuned classifier
+                    replay_embed, replay_labels = batch
                     optimizer.zero_grad()
-                    #Forwar Memory
-                    # replay_embed, replay_labels = sample_batch(self.past_memory, 32, self.past_label_set)
                     replay_labels = torch.tensor(replay_labels).cuda()
-                    # replay_embed = torch.stack(replay_embed)
                     replay_reps = self.classifier(replay_embed.cuda())
                     # replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     loss_mem = loss_fct(
@@ -199,7 +193,7 @@ class Trainer:
             self.finetuned_classifier.eval()
             self.past_classifier.eval()
             self.finetuned_classifier_mem.eval()
-            replay_loader = MemoryLoader(self.buffer_embedding, 64, self.curr_label_set)
+            cur_loader = MemoryLoader(self.buffer_embedding, 32, self.curr_label_set)
             for epoch in range(self.args.epochs_list[self.task_num - 1]):
 
                 correct, total = 0, 0
@@ -207,22 +201,17 @@ class Trainer:
                 total_distill_loss = 0
                 total_distill_loss_mem = 0
                 total_loss_mem = 0
-                
-                # for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
-                for idx, batch in enumerate(tqdm(replay_loader, desc=f"Training Epoch {epoch}")):
+                for idx, batch, replay_batch in enumerate(tqdm(cur_loader),tqdm(replay_loader, desc=f"Training Epoch {epoch}")):
                     cur_embed, cur_labels = batch
                     #Distill current classifier vs finetuned classifier
                     optimizer.zero_grad()
-                    # cur_embed, cur_labels = sample_batch(self.buffer_embedding, 64, self.curr_label_set)
                     cur_labels = torch.tensor(cur_labels).cuda()
-                    # cur_embed = torch.stack(cur_embed)
                     cur_reps = self.classifier(cur_embed.cuda())
                     # cur_reps[:,:self.classifier.old_num_labels] = -1e4
                     loss_fct = nn.CrossEntropyLoss()
                     loss = loss_fct(
                         cur_reps.view(-1, cur_reps.shape[-1]), cur_labels.view(-1))
 
-                    # cur_reps = self.classifier(cur_embed.cuda())
                     # cur_reps[:,:self.classifier.old_num_labels] = -1e4
                     with torch.no_grad():
                         past_reps = self.finetuned_classifier(cur_embed.cuda())
@@ -230,9 +219,9 @@ class Trainer:
                     distill_loss = self.distill_loss(
                         cur_reps, past_reps) 
                     #Forwar Memory
-                    replay_embed, replay_labels = sample_batch(self.past_memory, 64, self.past_label_set)
+                    replay_embed, replay_labels = replay_batch
                     replay_labels = torch.tensor(replay_labels).cuda()
-                    replay_embed = torch.stack(replay_embed)
+                    # replay_embed = torch.stack(replay_embed)
                     replay_reps = self.classifier(replay_embed.cuda())
                     # replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     loss_mem = loss_fct(
