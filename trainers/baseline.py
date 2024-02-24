@@ -201,7 +201,7 @@ class Trainer:
                 total_distill_loss = 0
                 total_distill_loss_mem = 0
                 total_loss_mem = 0
-                for idx, batch, replay_batch in enumerate(zip(tqdm(cur_loader),tqdm(replay_loader, desc=f"Training Epoch {epoch}"))):
+                for idx, (batch, replay_batch) in enumerate(tqdm(zip(cur_loader,replay_loader), desc=f"Training Epoch {epoch}")):
                     cur_embed, cur_labels = batch
                     #Distill current classifier vs finetuned classifier
                     optimizer.zero_grad()
