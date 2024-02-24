@@ -123,7 +123,7 @@ class Trainer:
             self.past_classifier = self.classifier.get_cur_classifer()
             self.past_classifier.cuda()
             self.classifier.train()
-            for epoch in range(20):
+            for epoch in range(10):
                 #Finetune classifier on current data
                 correct, total = 0, 0
                 total_loss = 0
@@ -160,7 +160,7 @@ class Trainer:
             # self.finetuned_classifier.eval()
             # self.past_classifier.eval()
             replay_loader = MemoryLoader(self.past_memory, 32, self.past_label_set)
-            for epoch in range(20):
+            for epoch in range(5):
                 #Finetune classifier on replay data
                 correct, total = 0, 0
                 total_loss = 0
@@ -186,6 +186,7 @@ class Trainer:
                     pred = torch.argmax(replay_reps, dim=1)
                     correct += torch.sum(pred == replay_labels).item()
                     total += len(replay_labels)
+                print(f"Epoch {epoch} Training Accuracy: {correct/total}")
 
             self.finetuned_classifier_mem = self.classifier.get_cur_classifer()
             self.finetuned_classifier_mem.cuda()
