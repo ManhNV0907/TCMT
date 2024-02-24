@@ -139,9 +139,10 @@ class Classifier(nn.Module):
         self.num_tasks = 0
         # self.old_model = None
         # self.cur_model = None
-        self.head = nn.Sequential(
-            nn.Linear(768, 768, bias=True),
-            nn.ReLU(inplace=True),
+        # self.head = nn.Sequential(
+        #     nn.Linear(768, 768, bias=True),
+        #     nn.ReLU(inplace=True),
+            
             # nn.Linear(768, 384, bias=True),
             # nn.ReLU(inplace=True),
             # nn.Linear(384, 384, bias=True),
@@ -152,14 +153,14 @@ class Classifier(nn.Module):
             # nn.ReLU(inplace=True),
             # nn.Linear(192, 96, bias=True),
             # nn.ReLU(inplace=True),
-        )
+        # )
     def get_cur_classifer(self):
         self.cur_model = None
         self.cur_model = deepcopy(self)
         return self.cur_model
 
     def forward(self, x: torch.Tensor):
-        x = self.head(x)
+        # x = self.head(x)
         out = self.top_linear(x)
         return out    
 
@@ -167,10 +168,6 @@ class Classifier(nn.Module):
         self.old_num_labels = self.num_labels
 
         self.num_tasks += 1
-        # save old model for distillation
-        # if self.num_tasks > 0:
-        #     self.old_model = None
-        #     self.old_model = deepcopy(self)
         with torch.no_grad():
             # expand classifier
             num_old_labels = self.num_labels

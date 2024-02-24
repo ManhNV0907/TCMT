@@ -10,10 +10,10 @@ from transformers import get_linear_schedule_with_warmup
 from model.baseline import Encoder, Classifier
 from utils.read_data import statistic
 from utils.replay_dataloader import MemoryLoader
+from utils.mtl import *
 import torch.nn.functional as F
 from sklearn.mixture import GaussianMixture
 import random
-from scipy.optimize import minimize
 
 
 class Trainer:
@@ -21,9 +21,7 @@ class Trainer:
     def __init__(self, args):
         self.args = args
         self.task_num = 0
-        # past classifier
         self.past_classifier = None
-        # Classifier
         self.encoder = Encoder(args)
         self.classifier = Classifier(args)
         self.buffer_distribution = {}
@@ -88,9 +86,9 @@ class Trainer:
             self.key_mixture[label] = GaussianMixture(n_components=1, random_state=42).fit(self.buffer_distribution[label])
             # if self.args.gmm_num_components == 1:
             # self.key_mixture[label].weights_[0] = 1.0
-        #Sample prelogits 
+        #Sample prelogits for each label
         for i, label in enumerate(self.curr_label_set):
-            replay_embedding =  self.key_mixture[label].sample(51200)[0].astype("float32")
+            replay_embedding =  self.key_mixture[label].sample(5120)[0].astype("float32")
             self.buffer_embedding[label].append(torch.tensor(replay_embedding))
         
         if self.task_num ==1:
@@ -132,7 +130,6 @@ class Trainer:
                     # _, _, labels = batch
                     labels = cur_label[idx]
                     labels = labels.cuda()
-                    # print(labels)
                     optimizer.zero_grad()
                     logits = self.classifier(cur_embeding[idx].cuda())
                     # logits[:, :self.classifier.old_num_labels] = -1e4
@@ -156,43 +153,11 @@ class Trainer:
             optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
             scheduler = get_linear_schedule_with_warmup(
                                     optimizer, num_warmup_steps, num_training_steps)
-            self.classifier.train()
-            # self.finetuned_classifier.eval()
-            # self.past_classifier.eval()
             replay_loader = MemoryLoader(self.past_memory, 32, self.past_label_set)
-            for epoch in range(5):
-                #Finetune classifier on replay data
-                correct, total = 0, 0
-                total_loss = 0
-                total_loss_mem = 0
-                for idx, batch in enumerate(tqdm(replay_loader, desc=f"Training Epoch {epoch}")):
-                    #Distill current classifier vs finetuned classifier
-                    replay_embed, replay_labels = batch
-                    optimizer.zero_grad()
-                    replay_labels = torch.tensor(replay_labels).cuda()
-                    replay_reps = self.classifier(replay_embed.cuda())
-                    # replay_reps[:,self.classifier.old_num_labels:] = -1e4
-                    loss_mem = loss_fct(
-                        replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
-                    loss_mem.backward()
-                    optimizer.step()
-                    scheduler.step()
-                    pred = torch.argmax(replay_reps, dim=1)
-                    correct += torch.sum(pred == replay_labels).item()
-                    total += len(replay_labels)
-                print(f"Epoch {epoch} Training Accuracy: {correct/total}")
 
-            self.finetuned_classifier_mem = self.classifier.get_cur_classifer()
-            self.finetuned_classifier_mem.cuda()
-
-            self.classifier = self.past_classifier
-            optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
-            scheduler = get_linear_schedule_with_warmup(
-                                    optimizer, num_warmup_steps, num_training_steps)
             self.classifier.train()
             self.finetuned_classifier.eval()
             self.past_classifier.eval()
-            self.finetuned_classifier_mem.eval()
             cur_loader = MemoryLoader(self.buffer_embedding, 32, self.curr_label_set)
             for epoch in range(self.args.epochs_list[self.task_num - 1]):
 
@@ -207,15 +172,12 @@ class Trainer:
                     optimizer.zero_grad()
                     cur_labels = torch.tensor(cur_labels).cuda()
                     cur_reps = self.classifier(cur_embed.cuda())
-                    # cur_reps[:,:self.classifier.old_num_labels] = -1e4
                     loss_fct = nn.CrossEntropyLoss()
                     loss = loss_fct(
                         cur_reps.view(-1, cur_reps.shape[-1]), cur_labels.view(-1))
 
-                    # cur_reps[:,:self.classifier.old_num_labels] = -1e4
                     with torch.no_grad():
                         past_reps = self.finetuned_classifier(cur_embed.cuda())
-                    # past_reps[:,:self.classifier.old_num_labels] = -1e4
                     distill_loss = self.distill_loss(
                         cur_reps, past_reps) 
                     #Forwar Memory
@@ -225,11 +187,9 @@ class Trainer:
                     # replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     loss_mem = loss_fct(
                         replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
-                    # replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     
                     with torch.no_grad():
-                        # past_replay_reps = self.past_classifier(replay_embed.cuda())
-                        past_replay_reps = self.finetuned_classifier_mem(replay_embed.cuda())
+                        past_replay_reps = self.past_classifier(replay_embed.cuda())
                     # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     distill_loss_mem = self.distill_loss(
                         replay_reps, past_replay_reps)
@@ -278,13 +238,11 @@ class Trainer:
 
 
 
-                    # shared_grad = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))["updating_grad"]
                     mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
                     # mtl_output = AUGD(torch.stack([distill_shared_grad, distill_mem_shared_grad]))
                     # mtl_output = CAGrad(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
 
                     # mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
-                    # mtl_output = AUGD(torch.stack([loss_shared_grad,distill_mem_shared_grad]))
                     shared_grad = mtl_output["updating_grad"]
                     # print("Alpha: ", mtl_output["alpha"])
                     # print("Norm_grad", mtl_output["norm_grads"])
@@ -299,8 +257,6 @@ class Trainer:
                             total_length += length
 
                     # training_loss = 5*loss + 5*distill_loss + loss_mem + 10*distill_loss_mem
-                    # training_loss = 0.2*loss + 0.3*distill_loss + 0.5*distill_loss_mem
-                    # training_loss = 0.2*loss + 0.3*distill_loss + 0.5*loss_mem
                     # training_loss.backward()
                     optimizer.step()
                     scheduler.step()
@@ -396,110 +352,3 @@ def sample_batch(memory, batch_size, labels):
 
   return inputs_batch, labels_batch
 
-def AUGD(grads_list):
-
-    scale_norm_grads1 = {}
-    scale_norm_grads = {}
-    grads = {}
-    norm_grads = {}
-    norms = {}
-    for i, grad in enumerate(grads_list):
-
-        norm_term = torch.norm(grad)
-
-        grads[i] = grad
-        norm_grads[i] = grad / norm_term
-        norms[i] = norm_term
-    for i, g in enumerate(grads_list):
-        if i > 0:
-            scale_norm_grads1[i] = norm_grads[0]*torch.norm(grads[i])
-            scale_norm_grads[i] = norm_grads[i]*torch.norm(grads[0])
-    G = torch.stack(tuple(v for v in grads.values()))
-    U = torch.stack(tuple(v for v in norm_grads.values()))
-    U1 = torch.stack(tuple(v for v in scale_norm_grads1.values()))
-    U2 = torch.stack(tuple(v for v in scale_norm_grads.values()))
-
-    D = G[0, ] - G[1:, ]
-
-    U = (U1-U2)
-    first_element = torch.matmul(
-        G[0, ], U.t(),
-    )
-    try:
-        second_element = torch.inverse(torch.matmul(D, U.t()))
-    except:
-        # workaround for cases where matrix is singular
-        second_element = torch.inverse(
-            torch.eye(len(grads_list) - 1, device=norm_term.device) * 1e-8
-            + torch.matmul(D, U.t())
-        )
-
-    alpha_ = torch.matmul(first_element, second_element)
-    alpha = torch.cat(
-        (torch.tensor(1 - alpha_.sum(), device=norm_term.device).unsqueeze(-1), alpha_)
-    )
-    new_grad =  sum([alpha[i] * grads[i] for i in range(len(grads_list))])
-    new_grad = new_grad*(torch.norm(grads[0])/torch.dot(new_grad,norm_grads[0]))
-    return dict(
-        updating_grad = new_grad,
-        alpha = alpha,
-        norm_grads = norms
-    )
-
-def PCGrad(grads: List[Tuple[torch.Tensor]], reduction: str = "sum") -> torch.Tensor:
-    pc_grad = copy.deepcopy(grads)
-    for g_i in pc_grad:
-        random.shuffle(grads)
-        for g_j in grads:
-            g_i_g_j = sum(
-                [
-                    torch.dot(torch.flatten(grad_i), torch.flatten(grad_j))
-                    for grad_i, grad_j in zip(g_i, g_j)
-                ]
-            )
-            if g_i_g_j < 0:
-                g_j_norm_square = (
-                    torch.norm(torch.cat([torch.flatten(g) for g in g_j])) ** 2
-                )
-                for grad_i, grad_j in zip(g_i, g_j):
-                    grad_i -= g_i_g_j * grad_j / g_j_norm_square
-
-    merged_grad = [sum(g) for g in zip(*pc_grad)]
-    if reduction == "mean":
-        merged_grad = [g / len(grads) for g in merged_grad]
-
-    return dict(updating_grad = merged_grad)
-def CAGrad(grads, alpha=0.5, rescale=1):
-    n_tasks = len(grads)
-    grads = grads.t()
-
-    GG = grads.t().mm(grads).cpu()  # [num_tasks, num_tasks]
-    g0_norm = (GG.mean() + 1e-8).sqrt()  # norm of the average gradient
-
-    x_start = np.ones(n_tasks) / n_tasks
-    bnds = tuple((0, 1) for x in x_start)
-    cons = {"type": "eq", "fun": lambda x: 1 - sum(x)}
-    A = GG.numpy()
-    b = x_start.copy()
-    c = (alpha * g0_norm + 1e-8).item()
-
-    def objfn(x):
-        return (
-            x.reshape(1, n_tasks).dot(A).dot(b.reshape(n_tasks, 1))
-            + c
-            * np.sqrt(x.reshape(1, n_tasks).dot(A).dot(x.reshape(n_tasks, 1)) + 1e-8)
-        ).sum()
-
-    res = minimize(objfn, x_start, bounds=bnds, constraints=cons)
-    w_cpu = res.x
-    ww = torch.Tensor(w_cpu).to(grads.device)
-    gw = (grads * ww.view(1, -1)).sum(1)
-    gw_norm = gw.norm()
-    lmbda = c / (gw_norm + 1e-8)
-    g = grads.mean(1) + lmbda * gw
-    if rescale == 0:
-        return dict(updating_grad = g)
-    elif rescale == 1:
-        return dict(updating_grad = g / (1 + alpha ** 2))
-    else:
-        return dict(updating_grad = g / (1 + alpha))
