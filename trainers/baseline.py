@@ -175,7 +175,7 @@ class Trainer:
                     #Forwar Memory
                     # replay_embed, replay_labels = sample_batch(self.past_memory, 32, self.past_label_set)
                     replay_labels = torch.tensor(replay_labels).cuda()
-                    replay_embed = torch.stack(replay_embed)
+                    # replay_embed = torch.stack(replay_embed)
                     replay_reps = self.classifier(replay_embed.cuda())
                     # replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     loss_mem = loss_fct(
@@ -214,7 +214,7 @@ class Trainer:
                     optimizer.zero_grad()
                     # cur_embed, cur_labels = sample_batch(self.buffer_embedding, 64, self.curr_label_set)
                     cur_labels = torch.tensor(cur_labels).cuda()
-                    cur_embed = torch.stack(cur_embed)
+                    # cur_embed = torch.stack(cur_embed)
                     cur_reps = self.classifier(cur_embed.cuda())
                     # cur_reps[:,:self.classifier.old_num_labels] = -1e4
                     loss_fct = nn.CrossEntropyLoss()
