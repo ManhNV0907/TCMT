@@ -25,5 +25,6 @@ class MemoryDataset(Dataset):
 def MemoryLoader(memory, batch_size, labels):
     dataset = MemoryDataset(memory, labels)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    inputs_batch, labels_batch = next(iter(dataloader))
-    return inputs_batch, labels_batch
+    return dataloader
+    # inputs_batch, labels_batch = next(iter(dataloader))
+    # return inputs_batch, labels_batch
