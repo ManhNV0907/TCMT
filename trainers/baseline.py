@@ -167,7 +167,8 @@ class Trainer:
                 total_loss_mem = 0
                 # for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
                 for idx, batch in enumerate(tqdm(replay_loader, desc=f"Training Epoch {epoch}")):
-                    print(batch)
+                    print(batch[0])
+                    print(len(batch))
                     cur_embed, cur_labels = batch
                     #Distill current classifier vs finetuned classifier
                     optimizer.zero_grad()
