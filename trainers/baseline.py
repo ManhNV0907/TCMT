@@ -154,7 +154,7 @@ class Trainer:
             optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
             scheduler = get_linear_schedule_with_warmup(
                                     optimizer, num_warmup_steps, num_training_steps)
-            replay_loader = MemoryLoader(self.past_memory, 64, self.past_label_set)
+            replay_loader = MemoryLoader(self.past_memory, 1024, self.past_label_set)
 
             self.classifier.train()
             self.finetuned_classifier.eval()
@@ -183,8 +183,7 @@ class Trainer:
                     distill_loss = self.distill_loss(
                         cur_reps, past_reps) 
                     #Forwar Memory
-                    replay_embed, replay_labels = replay_loader[idx]
-                    # replay_embed, replay_labels = next(iter(replay_loader))
+                    replay_embed, replay_labels = next(iter(replay_loader))
                     # replay_embed, replay_labels = replay_batch
                     replay_labels = torch.tensor(replay_labels).cuda()
                     replay_reps = self.classifier(replay_embed.cuda())
@@ -246,7 +245,7 @@ class Trainer:
                     # mtl_output = AUGD(torch.stack([distill_shared_grad, distill_mem_shared_grad]))
                     # mtl_output = CAGrad(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
 
-                    mtl_output = CAGrad(torch.stack([loss_shared_grad, loss_mem_shared_grad, distill_shared_grad]))
+                    mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad, distill_shared_grad]))
                     # mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
                     # mtl_output = CAGrad(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
                     shared_grad = mtl_output["updating_grad"]
