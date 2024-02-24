@@ -83,12 +83,12 @@ class Trainer:
                 self.buffer_distribution[labels[i].item()].append(outputs[i].cpu())
         
         for label in self.curr_label_set:
-            self.key_mixture[label] = GaussianMixture(n_components=2, random_state=42).fit(self.buffer_distribution[label])
+            self.key_mixture[label] = GaussianMixture(n_components=1, random_state=42).fit(self.buffer_distribution[label])
             # if self.args.gmm_num_components == 1:
-            # self.key_mixture[label].weights_[0] = 1.0
+            self.key_mixture[label].weights_[0] = 1.0
         #Sample prelogits for each label
         for i, label in enumerate(self.curr_label_set):
-            replay_embedding =  self.key_mixture[label].sample(5120)[0].astype("float32")
+            replay_embedding =  self.key_mixture[label].sample(51200)[0].astype("float32")
             self.buffer_embedding[label].append(torch.tensor(replay_embedding))
         
         if self.task_num ==1:
