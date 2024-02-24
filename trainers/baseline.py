@@ -240,10 +240,10 @@ class Trainer:
 
                     # mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
                     # mtl_output = AUGD(torch.stack([distill_shared_grad, distill_mem_shared_grad]))
-                    # mtl_output = CAGrad(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
+                    mtl_output = CAGrad(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
 
                     # mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
-                    mtl_output = CAGrad(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
+                    # mtl_output = CAGrad(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
                     shared_grad = mtl_output["updating_grad"]
                     # print("Alpha: ", mtl_output["alpha"])
                     # print("Norm_grad", mtl_output["norm_grads"])
