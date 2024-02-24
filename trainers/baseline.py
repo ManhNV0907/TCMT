@@ -88,7 +88,7 @@ class Trainer:
             # self.key_mixture[label].weights_[0] = 1.0
         #Sample prelogits for each label
         for i, label in enumerate(self.curr_label_set):
-            replay_embedding =  self.key_mixture[label].sample(5120)[0].astype("float32")
+            replay_embedding =  self.key_mixture[label].sample(51200)[0].astype("float32")
             self.buffer_embedding[label].append(torch.tensor(replay_embedding))
         
         if self.task_num ==1:
@@ -153,7 +153,7 @@ class Trainer:
             optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
             scheduler = get_linear_schedule_with_warmup(
                                     optimizer, num_warmup_steps, num_training_steps)
-            replay_loader = MemoryLoader(self.past_memory, 32, self.past_label_set)
+            replay_loader = MemoryLoader(self.past_memory, 128, self.past_label_set)
 
             self.classifier.train()
             self.finetuned_classifier.eval()
@@ -243,6 +243,7 @@ class Trainer:
                     # mtl_output = CAGrad(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
 
                     mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
+                    # mtl_output = CAGrad(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
                     shared_grad = mtl_output["updating_grad"]
                     # print("Alpha: ", mtl_output["alpha"])
                     # print("Norm_grad", mtl_output["norm_grads"])
