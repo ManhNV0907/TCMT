@@ -267,7 +267,7 @@ class Trainer:
                     #     ].reshape(param.shape)
                         # total_length += length
 
-                    training_loss = loss + distill_loss + 2*loss_mem + 2*distill_loss_mem
+                    training_loss = loss + distill_loss + 5*loss_mem + 5*distill_loss_mem
                     # training_loss = 0.7*loss + 0.3*loss_mem 
 
                     training_loss.backward()
