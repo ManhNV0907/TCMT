@@ -13,7 +13,7 @@ class Encoder(nn.Module):
         super().__init__()
         self.args = args
         self.config = AutoConfig.from_pretrained(args.model_name_or_path)
-        self.config.hidden_size = 384
+        # self.config.hidden_size = 384
         self.model = AutoModel.from_pretrained(
             args.model_name_or_path, config=self.config)
 
@@ -139,7 +139,7 @@ class Classifier(nn.Module):
         self.num_labels = 0
         self.num_tasks = 0
         self.head = nn.Sequential(
-            nn.Linear(768, 384, bias=True),
+            nn.Linear(768, 768, bias=True),
             nn.ReLU(inplace=True),  
         )
     # def get_cur_classifer(self):
