@@ -10,7 +10,7 @@ class MemoryDataset(Dataset):
         self.labels_list = []
 
         for label in self.labels:
-            input_ids_list = self.memory.get(label, [])
+            input_ids_list = self.memory.get(label, [])[0]
             self.inputs.extend(input_ids_list)
             self.labels_list.extend([label] * len(input_ids_list))
 
