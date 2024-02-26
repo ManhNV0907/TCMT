@@ -2,6 +2,7 @@ import math
 import torch
 from torch import nn
 import copy
+from copy import deepcopy
 import numpy as np
 from tqdm import tqdm
 from typing import List, Tuple
@@ -88,7 +89,7 @@ class Trainer:
             self.key_mixture[label].weights_[0] = 1.0
         #Sample prelogits for each label
         for i, label in enumerate(self.curr_label_set):
-            replay_embedding =  self.key_mixture[label].sample(102400)[0].astype("float32")
+            replay_embedding =  self.key_mixture[label].sample(512)[0].astype("float32")
             self.buffer_embedding[label].append(torch.tensor(replay_embedding))
         
         if self.task_num ==1:
@@ -118,11 +119,12 @@ class Trainer:
                 print(f"Epoch {epoch} Training Accuracy: {correct/total}")
                 print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
         else:
-            self.past_classifier = self.classifier.get_cur_classifer()
+            # self.past_classifier = self.classifier.get_cur_classifer()
+            self.past_classifier = deepcopy(self.classifier)
             self.past_classifier.cuda()
             self.classifier.train()
             for epoch in range(10):
-                #Finetune classifier on current data
+                #Finetune classifier on current GMM data
                 correct, total = 0, 0
                 total_loss = 0
                 for idx, batch in enumerate(tqdm(loader, desc=f"Training Epoch {epoch}")):
@@ -147,14 +149,16 @@ class Trainer:
                 print(f"Epoch {epoch} Training Accuracy: {correct/total}")
                 # print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
 
-            self.finetuned_classifier = self.classifier.get_cur_classifer()
+            # self.finetuned_classifier = self.classifier.get_cur_classifer()
+            self.finetuned_classifier = deepcopy(self.classifier)
             self.finetuned_classifier.cuda()
-            self.classifier = self.past_classifier.get_cur_classifer()
+            # self.classifier = self.past_classifier.get_cur_classifer()
+            self.classifier = deepcopy(self.past_classifier)
             self.classifier.cuda()
             optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
             scheduler = get_linear_schedule_with_warmup(
                                     optimizer, num_warmup_steps, num_training_steps)
-            replay_loader = MemoryLoader(self.past_memory, 1024, self.past_label_set)
+            replay_loader = MemoryLoader(self.past_memory, 32, self.past_label_set)
 
             self.classifier.train()
             self.finetuned_classifier.eval()
@@ -195,7 +199,7 @@ class Trainer:
                         past_replay_reps = self.past_classifier(replay_embed.cuda())
                     # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     distill_loss_mem = self.distill_loss(
-                        replay_reps[:,:self.classifier.old_num_labels], past_replay_reps[:,:self.classifier.old_num_labels])
+                        replay_reps, past_replay_reps)
                     
                     # Backward and optimize
                     loss.backward(retain_graph=True)
@@ -254,12 +258,12 @@ class Trainer:
 
                     total_length = 0
                     for name, param in self.classifier.named_parameters():
-                        if 'cur' not in name:
-                            length = param.numel()
-                            param.grad.data = shared_grad[
-                                total_length : total_length + length
-                            ].reshape(param.shape)
-                            total_length += length
+                        # if 'cur' not in name:
+                        length = param.numel()
+                        param.grad.data = shared_grad[
+                            total_length : total_length + length
+                        ].reshape(param.shape)
+                        total_length += length
 
                     # training_loss = 5*loss + 5*distill_loss + loss_mem + 10*distill_loss_mem
                     # training_loss.backward()
