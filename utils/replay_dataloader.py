@@ -19,7 +19,7 @@ class MemoryDataset(Dataset):
             input_ids_list = self.memory.get(label, [])
             for input_ids in input_ids_list:
                 self.inputs.extend(input_ids)
-                self.labels_list.extend([label] * len(input_ids))
+            self.labels_list.extend([label] * len(input_ids_list))
 
 
     def __len__(self):
