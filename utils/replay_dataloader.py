@@ -9,17 +9,17 @@ class MemoryDataset(Dataset):
         self.inputs = []
         self.labels_list = []
 
-        # for label in self.labels:
-        #     input_ids_list = self.memory.get(label, [])[0]
-        #     print(len(input_ids_list))
-        #     print(len(input_ids_list[0]))
-        #     self.inputs.extend(input_ids_list)
-        #     self.labels_list.extend([label] * len(input_ids_list))
         for label in self.labels:
-            input_ids_list = self.memory.get(label, [])
-            for input_ids in input_ids_list:
-                self.inputs.extend(input_ids)
+            input_ids_list = self.memory.get(label, [])[0]
+            print(len(input_ids_list))
+            print(len(input_ids_list[0]))
+            self.inputs.extend(input_ids_list)
             self.labels_list.extend([label] * len(input_ids_list))
+        # for label in self.labels:
+        #     input_ids_list = self.memory.get(label, [])
+        #     for input_ids in input_ids_list:
+        #         self.inputs.extend(input_ids)
+        #     self.labels_list.extend([label] * len(input_ids_list))
 
 
     def __len__(self):
