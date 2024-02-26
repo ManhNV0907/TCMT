@@ -89,7 +89,7 @@ class Trainer:
             self.key_mixture[label].weights_[0] = 1.0
         #Sample prelogits for each label
         for i, label in enumerate(self.curr_label_set):
-            replay_embedding =  self.key_mixture[label].sample(2048)[0].astype("float32")
+            replay_embedding =  self.key_mixture[label].sample(20480)[0].astype("float32")
             self.buffer_embedding[label].append(torch.tensor(replay_embedding))
         
         if self.task_num ==1:
@@ -250,8 +250,8 @@ class Trainer:
                     # mtl_output = CAGrad(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
 
                     # mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad, distill_shared_grad]))
-                    mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
-                    # mtl_output = CAGrad(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
+                    # mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
+                    mtl_output = CAGrad(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
                     shared_grad = mtl_output["updating_grad"]
                     # print("Alpha: ", mtl_output["alpha"])
                     # print("Norm_grad", mtl_output["norm_grads"])
