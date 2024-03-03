@@ -128,7 +128,7 @@ class Trainer:
             for param in self.past_classifier.parameters():
                 param.requires_grad = False
             self.classifier.train()
-            for epoch in range(10):
+            for epoch in range(20):
                 #Finetune classifier on current GMM data
                 correct, total = 0, 0
                 total_loss = 0
@@ -171,7 +171,7 @@ class Trainer:
             self.finetuned_classifier.eval()
             self.past_classifier.eval()
             
-            cur_loader = MemoryLoader(self.cur_memory, 256, self.curr_label_set)
+            cur_loader = MemoryLoader(self.cur_memory, 32, self.curr_label_set)
             # cur_loader = MemoryLoader(self.buffer_embedding, 512, self.curr_label_set)
             for epoch in range(self.args.epochs_list[self.task_num - 1]):
 

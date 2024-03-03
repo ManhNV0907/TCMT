@@ -133,12 +133,16 @@ class Classifier(nn.Module):
         self.config = AutoConfig.from_pretrained(args.model_name_or_path)
         # self.config.hidden_size = 96
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.top_linear = nn.Linear(self.config.hidden_size,20)
-        # self.top_linear = nn.Linear(self.config.hidden_size,0)
+        # self.top_linear = nn.Linear(self.config.hidden_size,20)
+        self.top_linear = nn.Linear(self.config.hidden_size,0)
         
         self.num_labels = 0
         self.num_tasks = 0
         self.head = nn.Sequential(
+            nn.Linear(768, 768, bias=True),
+            nn.ReLU(inplace=True),  
+            nn.Linear(768, 768, bias=True),
+            nn.ReLU(inplace=True),  
             nn.Linear(768, 768, bias=True),
             nn.ReLU(inplace=True),  
         )
@@ -156,13 +160,13 @@ class Classifier(nn.Module):
         self.old_num_labels = self.num_labels
 
         self.num_tasks += 1
-        # with torch.no_grad():
-        #     # expand classifier
-        #     num_old_labels = self.num_labels
-        #     self.num_labels += num_labels
-        #     w = self.top_linear.weight.data.clone()
-        #     b = self.top_linear.bias.data.clone()
-        #     self.top_linear = nn.Linear(
-        #         self.config.hidden_size, self.num_labels, device=self.device)
-        #     self.top_linear.weight.data[:num_old_labels] = w
-        #     self.top_linear.bias.data[:num_old_labels] = b
+        with torch.no_grad():
+            # expand classifier
+            num_old_labels = self.num_labels
+            self.num_labels += num_labels
+            w = self.top_linear.weight.data.clone()
+            b = self.top_linear.bias.data.clone()
+            self.top_linear = nn.Linear(
+                self.config.hidden_size, self.num_labels, device=self.device)
+            self.top_linear.weight.data[:num_old_labels] = w
+            self.top_linear.bias.data[:num_old_labels] = b
