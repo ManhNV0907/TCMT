@@ -161,7 +161,7 @@ class Trainer:
             self.classifier.train()
             self.finetuned_classifier.eval()
             self.past_classifier.eval()
-            cur_loader = MemoryLoader(self.buffer_embedding, 32, self.curr_label_set)
+            cur_loader = MemoryLoader(self.buffer_embedding, 512, self.curr_label_set)
             for epoch in range(self.args.epochs_list[self.task_num - 1]):
 
                 correct, total = 0, 0
