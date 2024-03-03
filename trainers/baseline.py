@@ -128,7 +128,7 @@ class Trainer:
             for param in self.past_classifier.parameters():
                 param.requires_grad = False
             self.classifier.train()
-            for epoch in range(20):
+            for epoch in range(30):
                 #Finetune classifier on current GMM data
                 correct, total = 0, 0
                 total_loss = 0
