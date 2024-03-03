@@ -125,6 +125,8 @@ class Trainer:
             # self.past_classifier = self.classifier.get_cur_classifer()
             self.past_classifier = deepcopy(self.classifier)
             self.past_classifier.cuda()
+            for param in self.past_classifier.parameters():
+                param.requires_grad = False
             self.classifier.train()
             for epoch in range(10):
                 #Finetune classifier on current GMM data
@@ -154,7 +156,11 @@ class Trainer:
 
             self.finetuned_classifier = deepcopy(self.classifier)
             self.finetuned_classifier.cuda()
+            for param in self.finetuned_classifier.parameters():
+                param.requires_grad = False
             self.classifier = deepcopy(self.past_classifier)
+            for param in self.classifier.parameters():
+                param.requires_grad = True
             self.classifier.cuda()
             optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
             scheduler = get_linear_schedule_with_warmup(
