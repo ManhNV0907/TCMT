@@ -149,10 +149,8 @@ class Trainer:
                 print(f"Epoch {epoch} Training Accuracy: {correct/total}")
                 # print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
 
-            # self.finetuned_classifier = self.classifier.get_cur_classifer()
             self.finetuned_classifier = deepcopy(self.classifier)
             self.finetuned_classifier.cuda()
-            # self.classifier = self.past_classifier.get_cur_classifer()
             self.classifier = deepcopy(self.past_classifier)
             self.classifier.cuda()
             optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
@@ -163,7 +161,7 @@ class Trainer:
             self.classifier.train()
             self.finetuned_classifier.eval()
             self.past_classifier.eval()
-            cur_loader = MemoryLoader(self.buffer_embedding, 32, self.curr_label_set)
+            cur_loader = MemoryLoader(self.buffer_embedding, 256, self.curr_label_set)
             for epoch in range(self.args.epochs_list[self.task_num - 1]):
 
                 correct, total = 0, 0
@@ -188,16 +186,13 @@ class Trainer:
                         cur_reps, past_reps) 
                     #Forwar Memory
                     replay_embed, replay_labels = next(iter(replay_loader))
-                    # replay_embed, replay_labels = replay_batch
                     replay_labels = torch.tensor(replay_labels).cuda()
                     replay_reps = self.classifier(replay_embed.cuda())
-                    # replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     loss_mem = loss_fct(
                         replay_reps.view(-1, replay_reps.shape[-1]), replay_labels.view(-1))
                     
                     with torch.no_grad():
                         past_replay_reps = self.past_classifier(replay_embed.cuda())
-                    # past_replay_reps[:,self.classifier.old_num_labels:] = -1e4
                     distill_loss_mem = self.distill_loss(
                         replay_reps, past_replay_reps)
                     
@@ -247,7 +242,9 @@ class Trainer:
 
                     # mtl_output = AUGD(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
                     # mtl_output = AUGD(torch.stack([distill_shared_grad, distill_mem_shared_grad]))
-                    mtl_output = CAGrad(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
+                    # mtl_output = CAGrad(torch.stack([distill_shared_grad, loss_shared_grad, loss_mem_shared_grad, distill_mem_shared_grad]))
+                    mtl_output = CAGrad(torch.stack([distill_shared_grad, loss_shared_grad, distill_mem_shared_grad]))
+
 
                     # mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad, distill_shared_grad]))
                     # mtl_output = AUGD(torch.stack([loss_shared_grad, loss_mem_shared_grad]))
@@ -288,16 +285,6 @@ class Trainer:
                 print(f"Epoch {epoch} Average total_distill_loss_mem: {total_distill_loss_mem/len(loader)}")
                 print(f"Epoch {epoch} Average total_distill_loss: {total_distill_loss/len(loader)}")
 
-
-
-
-           
-
-
-            # print(f"Epoch {epoch} Training Accuracy: {correct/total}")
-            # print(f"Epoch {epoch} Average Loss: {total_loss/len(loader)}")
-            # if test_dataset is not None:
-            #     self.evaluating(test_dataset)
 
     def evaluating(self, dataset):
         loader = DataLoader(
