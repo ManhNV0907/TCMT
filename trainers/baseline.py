@@ -159,7 +159,7 @@ class Trainer:
             optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
             scheduler = get_linear_schedule_with_warmup(
                                     optimizer, num_warmup_steps, num_training_steps)
-            replay_loader = MemoryLoader(self.past_memory, 256, self.past_label_set)
+            replay_loader = MemoryLoader(self.past_memory, 1024, self.past_label_set)
 
             self.classifier.train()
             self.finetuned_classifier.eval()
