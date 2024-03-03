@@ -34,9 +34,11 @@ class Trainer:
     def new_task(self, train_dataset, test_dataset, num_labels):
         self.task_num += 1
         self.past_memory = self.buffer_embedding
+        self.cur_memory = {}
         self.curr_label_set = set(train_dataset.labels)
         self.past_label_set = set(self.buffer_embedding.keys())
         for i in self.curr_label_set:
+            self.cur_memory[i] = [] 
             self.buffer_distribution[i] = [] 
             self.key_mixture[i] = None
             self.buffer_embedding[i] = []
@@ -91,6 +93,7 @@ class Trainer:
         for i, label in enumerate(self.curr_label_set):
             replay_embedding =  self.key_mixture[label].sample(20480)[0].astype("float32")
             self.buffer_embedding[label].append(torch.tensor(replay_embedding))
+            self.cur_memory[label].append(torch.tensor(replay_embedding))
         
         if self.task_num ==1:
             self.classifier.train()
@@ -156,12 +159,14 @@ class Trainer:
             optimizer = torch.optim.AdamW(self.classifier.parameters(), lr=self.args.lr_list[self.task_num - 1], weight_decay=0.0)
             scheduler = get_linear_schedule_with_warmup(
                                     optimizer, num_warmup_steps, num_training_steps)
-            replay_loader = MemoryLoader(self.past_memory, 512, self.past_label_set)
+            replay_loader = MemoryLoader(self.past_memory, 256, self.past_label_set)
 
             self.classifier.train()
             self.finetuned_classifier.eval()
             self.past_classifier.eval()
-            cur_loader = MemoryLoader(self.buffer_embedding, 512, self.curr_label_set)
+            
+            cur_loader = MemoryLoader(self.cur_memory, 256, self.curr_label_set)
+            # cur_loader = MemoryLoader(self.buffer_embedding, 512, self.curr_label_set)
             for epoch in range(self.args.epochs_list[self.task_num - 1]):
 
                 correct, total = 0, 0
